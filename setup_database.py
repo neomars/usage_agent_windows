@@ -3,156 +3,114 @@ import getpass
 import configparser
 import sys
 import os
+import messages # Import the new messages module
 
 try:
     import mariadb
 except ImportError:
-    print("Error: MariaDB connector (python-mariadb) not found.")
-    print("Please ensure it is installed for the Python environment this script is using.")
-    print("You can typically install it with: pip install mariadb")
+    print(messages.SETUP_ERROR_MARIADB_MODULE_IMPORT)
     sys.exit(1)
 
 try:
     from sql_ddl import ALL_TABLES_DDL
 except ImportError:
-    print("Error: Could not import DDL statements from sql_ddl.py.")
-    print("Ensure sql_ddl.py is in the project root directory or accessible in PYTHONPATH.")
+    print(messages.SETUP_ERROR_SQLDDL_IMPORT)
     sys.exit(1)
 
 def setup_database():
-    print("--- Database Setup Script ---")
-    print("This script will guide you through setting up the MariaDB database and user for the application.")
-    print("You will need credentials for a MariaDB user with privileges to create databases and users (e.g., 'root').")
-    print("\nEnsure your MariaDB server is running before proceeding.\n")
+    print(messages.SETUP_HEADER)
+    print(messages.SETUP_INTRO_MAIN)
+    print(messages.SETUP_INTRO_ASSUMPTION_HEADER)
+    print(messages.SETUP_INTRO_ASSUMPTION_DETAIL)
+    print(messages.SETUP_PRE_REQUISITE_DB_RUNNING)
 
-    db_host_admin_input = input("Enter MariaDB server host (where the application will connect) [localhost]: ").strip()
-    if not db_host_admin_input:
-        db_host_admin_input = 'localhost'
+    app_db_host = input(f"Enter MariaDB host for the application database [{messages.SETUP_PROMPT_DB_HOST_DEFAULT}]: ").strip()
+    if not app_db_host:
+        app_db_host = messages.SETUP_PROMPT_DB_HOST_DEFAULT
 
-    db_user_admin = input(f"Enter MariaDB admin username for host '{db_host_admin_input}' [root]: ").strip()
-    if not db_user_admin:
-        db_user_admin = 'root'
-
-    db_pass_admin = getpass.getpass(f"Enter password for MariaDB admin user '{db_user_admin}' on '{db_host_admin_input}': ")
-
-    print("\n--- Application Database Details ---")
-    app_db_name_default = 'agent_data_db'
-    app_db_name = input(f"Enter name for the application database [{app_db_name_default}]: ").strip()
+    app_db_name = input(f"Enter the name of the existing application database [{messages.SETUP_PROMPT_DB_NAME_DEFAULT}]: ").strip()
     if not app_db_name:
-        app_db_name = app_db_name_default
+        app_db_name = messages.SETUP_PROMPT_DB_NAME_DEFAULT
 
-    app_db_user_default = 'agent_app_user'
-    app_db_user = input(f"Enter username for the application user to be created [{app_db_user_default}]: ").strip()
+    app_db_user = input(f"Enter the existing application username for database '{app_db_name}' [{messages.SETUP_PROMPT_DB_USER_DEFAULT}]: ").strip()
     if not app_db_user:
-        app_db_user = app_db_user_default
-
-    # Determine the host for the new application user. Typically 'localhost' if app server is on same machine as DB.
-    app_user_host_default = 'localhost'
-    app_user_host = input(f"Allow application user '{app_db_user}' to connect from which host? [{app_user_host_default}]: ").strip()
-    if not app_user_host:
-        app_user_host = app_user_host_default
+        app_db_user = messages.SETUP_PROMPT_DB_USER_DEFAULT
 
     while True:
-        app_db_pass = getpass.getpass(f"Enter password for new application user '{app_db_user}'@{app_user_host}: ")
+        app_db_pass = getpass.getpass(f"Enter password for application user '{app_db_user}': ")
         if not app_db_pass:
-            print("Password cannot be empty. Please try again.")
+            print(messages.SETUP_ERROR_PASSWORD_EMPTY)
             continue
         app_db_pass_confirm = getpass.getpass(f"Confirm password for '{app_db_user}': ")
         if app_db_pass == app_db_pass_confirm:
             break
         else:
-            print("Passwords do not match. Please try again.")
+            print(messages.SETUP_ERROR_PASSWORD_MISMATCH)
 
-    print(f"\n--- Summary of Actions to be Performed ---")
-    print(f"  MariaDB Server Host:   {db_host_admin_input}")
-    print(f"  Admin User:            {db_user_admin}")
-    print(f"  Create Database:       {app_db_name}")
-    print(f"  Create App User:       {app_db_user}@{app_user_host}")
-    print("  Grant Privileges:      ALL on " + app_db_name + ".* to " + app_db_user + "@" + app_user_host)
-    print(f"  Create Tables in:      {app_db_name}")
-    print(f"  Write config to:       db_config.ini (with app user credentials for host '{db_host_admin_input}')")
+    print(messages.SETUP_SUMMARY_HEADER)
+    print(messages.SETUP_SUMMARY_DB_HOST.format(app_db_host))
+    print(messages.SETUP_SUMMARY_DB_NAME.format(app_db_name))
+    print(messages.SETUP_SUMMARY_DB_USER.format(app_db_user))
+    print(messages.SETUP_SUMMARY_DB_PASSWORD_SET)
+    print(messages.SETUP_SUMMARY_REVIEW_PROMPT_1)
+    print(messages.SETUP_SUMMARY_REVIEW_PROMPT_2)
 
     if input("\nProceed with these actions? (yes/no): ").strip().lower() != 'yes':
-        print("Database setup aborted by user.")
+        print(messages.SETUP_ABORTED_BY_USER)
         sys.exit(0)
 
-    # 1. Connect as Admin and Create Database/User
-    admin_conn = None
-    cursor = None
-    print(f"\n--- Step 1: Connecting as admin user '{db_user_admin}' to create database and application user ---")
-    try:
-        admin_conn = mariadb.connect(
-            host=db_host_admin_input,
-            user=db_user_admin,
-            password=db_pass_admin,
-            autocommit=False # Use autocommit=False to manage transactions explicitly
-        )
-        cursor = admin_conn.cursor()
-
-        print(f"Creating database '{app_db_name}' if it does not exist...")
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {app_db_name} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-
-        print(f"Creating application user '{app_db_user}'@'{app_user_host}' if it does not exist...")
-        # Need to handle user creation carefully if user already exists with different password or host part
-        # For simplicity, CREATE USER IF NOT EXISTS is used.
-        # Consider DROP USER IF EXISTS first if you want to ensure a clean setup with the new password.
-        cursor.execute(f"CREATE USER IF NOT EXISTS '{app_db_user}'@'{app_user_host}' IDENTIFIED BY '{app_db_pass}'")
-
-        print(f"Granting privileges on '{app_db_name}' to '{app_db_user}'@'{app_user_host}'...")
-        cursor.execute(f"GRANT ALL PRIVILEGES ON {app_db_name}.* TO '{app_db_user}'@'{app_user_host}'")
-
-        cursor.execute("FLUSH PRIVILEGES")
-        admin_conn.commit()
-        print("Database and application user created/verified successfully.")
-
-    except mariadb.Error as e:
-        if admin_conn: admin_conn.rollback()
-        print(f"MariaDB Error during admin operations: {e}")
-        sys.exit(1)
-    except Exception as e:
-        if admin_conn: admin_conn.rollback()
-        print(f"An unexpected error occurred during admin operations: {e}")
-        sys.exit(1)
-    finally:
-        if cursor: cursor.close()
-        if admin_conn: admin_conn.close()
-
-    # 2. Connect as App User and Create Tables
+    # 1. Connect as App User and Create Tables
     app_conn = None
     app_cursor = None
-    print(f"\n--- Step 2: Connecting as application user '{app_db_user}' to create tables in '{app_db_name}' ---")
+    print(messages.SETUP_STEP1_HEADER.format(app_db_name, app_db_host, app_db_user))
     try:
         app_conn = mariadb.connect(
-            host=db_host_admin_input, # App connects to the same host specified by admin for MariaDB server
+            host=app_db_host,
             user=app_db_user,
             password=app_db_pass,
             database=app_db_name
         )
+        print(messages.SETUP_STEP1_CONNECT_SUCCESS.format(app_db_name))
         app_cursor = app_conn.cursor()
 
-        print("Creating tables if they don't exist...")
+        print(messages.SETUP_STEP1_CREATING_TABLES)
         for ddl_statement in ALL_TABLES_DDL:
             app_cursor.execute(ddl_statement)
         app_conn.commit()
-        print("Tables created successfully in database '{app_db_name}'.")
+        print(messages.SETUP_STEP1_TABLES_SUCCESS.format(app_db_name))
 
     except mariadb.Error as e:
-        if app_conn: app_conn.rollback()
-        print(f"MariaDB Error during table creation with app user: {e}")
+        if app_conn:
+            try:
+                app_conn.rollback()
+                print(messages.SETUP_STEP1_ERROR_ROLLBACK)
+            except mariadb.Error as rb_err:
+                print(messages.SETUP_STEP1_ERROR_ROLLBACK_FAILED.format(rb_err))
+
+        print(messages.SETUP_STEP1_ERROR_TABLE_CREATION.format(e)) # Original MariaDB error
+        print(messages.SETUP_GUIDANCE_HEADER)
+        print(messages.SETUP_GUIDANCE_DB_RUNNING.format(app_db_host))
+        print(messages.SETUP_GUIDANCE_DB_EXISTS.format(app_db_name))
+        print(messages.SETUP_GUIDANCE_USER_EXISTS_PASSWORD.format(app_db_user))
+        print(messages.SETUP_GUIDANCE_USER_PERMISSIONS.format(app_db_user, app_db_name))
         sys.exit(1)
     except Exception as e:
-        if app_conn: app_conn.rollback()
-        print(f"An unexpected error occurred during table creation: {e}")
+        if app_conn:
+            try:
+                app_conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.SETUP_STEP1_ERROR_ROLLBACK_FAILED.format(rb_err))
+        print(messages.SETUP_STEP1_ERROR_TABLE_CREATION_UNEXPECTED.format(e))
         sys.exit(1)
     finally:
         if app_cursor: app_cursor.close()
         if app_conn: app_conn.close()
 
-    # 3. Create db_config.ini
-    print(f"\n--- Step 3: Creating database configuration file 'db_config.ini' ---")
+    # 2. Create db_config.ini
+    print(messages.SETUP_STEP2_HEADER)
     config = configparser.ConfigParser()
     config['database'] = {
-        'host': db_host_admin_input, # The host where MariaDB server is running
+        'host': app_db_host,
         'name': app_db_name,
         'user': app_db_user,
         'password': app_db_pass
@@ -161,15 +119,16 @@ def setup_database():
     try:
         with open('db_config.ini', 'w') as configfile:
             config.write(configfile)
-        print("'db_config.ini' created successfully.")
-        print("\nIMPORTANT: Secure the 'db_config.ini' file as it contains database credentials.")
-        print("Consider adding it to .gitignore if this project is under version control and the file should not be committed.")
+        print(messages.SETUP_STEP2_DBCONFIG_CREATED)
+        print(messages.SETUP_STEP2_DBCONFIG_REMINDER_SECURE)
+        print(messages.SETUP_STEP2_DBCONFIG_REMINDER_GITIGNORE)
     except IOError as e:
-        print(f"Error writing 'db_config.ini': {e}")
+        print(messages.SETUP_STEP2_ERROR_DBCONFIG_WRITE.format(e))
         sys.exit(1)
 
-    print("\n--- Database Setup Completed Successfully! ---")
-    print("You may need to update 'server.py' to load its database configuration from 'db_config.ini' instead of hardcoded values.")
+    print(messages.SETUP_FINAL_SUCCESS_HEADER)
+    print(messages.SETUP_FINAL_SUCCESS_DETAIL.format(app_db_name))
+    print(messages.SETUP_FINAL_SUCCESS_NEXT_STEP.format(app_db_name, app_db_host, app_db_user))
 
 if __name__ == "__main__":
     setup_database()

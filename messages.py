@@ -9,8 +9,8 @@ MSG_CONFIG_LOG_FOLDER = "Log Folder: {}"
 MSG_CONFIG_FOOTER = "---------------------------"
 MSG_CONFIG_FILE_NOT_FOUND = "Warning: Configuration file 'config.ini' not found. Using default settings."
 MSG_CONFIG_ERROR_READING = "Error reading 'config.ini': {}. Using default settings."
-MSG_SERVER_ADDRESS_MISSING_CONFIG = "Warning: Server address not configured in 'config.ini'. Using default (None)." # More specific
-MSG_SERVER_ADDRESS_NOT_CONFIGURED = "Warning: Server address not configured. Data transmission will be skipped." # General warning for main
+MSG_SERVER_ADDRESS_MISSING_CONFIG = "Warning: Server address not configured in 'config.ini'. Using default (None)."
+MSG_SERVER_ADDRESS_NOT_CONFIGURED = "Warning: Server address not configured. Data transmission will be skipped."
 
 # --- Module Availability Messages ---
 MSG_PSUTIL_NOT_AVAILABLE = "Warning: 'psutil' module not found. CPU usage will not be monitored. Please install it using 'pip install psutil'"
@@ -32,15 +32,14 @@ MSG_ERROR_GETTING_GPU = "Error getting GPU usage: {}"
 MSG_ERROR_GETTING_ACTIVE_WINDOW = "Error getting active window title: {}"
 
 # --- Main Loop Status Messages ---
-# MSG_COLLECTING_DATA = "Collecting data..." # Decided against, too noisy
-MSG_LOGGING_TO_FILE = "Logging data to: {}" # For initial log file path message
-MSG_LOG_FILE_DAILY_CHANGE = "New day, logging to: {}" # Used when log file name changes
-MSG_LOG_FILE_WRITING_ERROR = "Error writing to log file '{}': {}" # For specific file write error
-MSG_LOG_PATH_ERROR = "Error ensuring log path '{}' exists or writing to file: {}" # For os.makedirs or other path errors
+MSG_LOGGING_TO_FILE = "Logging data to: {}"
+MSG_LOG_FILE_DAILY_CHANGE = "New day, logging to: {}"
+MSG_LOG_FILE_WRITING_ERROR = "Error writing to log file '{}': {}"
+MSG_LOG_PATH_ERROR = "Error ensuring log path '{}' exists or writing to file: {}"
 MSG_JSON_SERIALIZATION_ERROR = "Error serializing data to JSON for logging: {}. Payload was: {}"
 
 # --- Data Transmission Messages ---
-MSG_SENDING_DATA_TO_SERVER = "Data successfully sent to {} (Status: {})" # Simplified success message
+MSG_SENDING_DATA_TO_SERVER = "Data successfully sent to {} (Status: {})"
 MSG_SEND_HTTP_ERROR = "HTTP error sending data to {}: {}"
 MSG_SEND_CONNECTION_ERROR = "Connection error sending data to {}: {}"
 MSG_SEND_TIMEOUT_ERROR = "Timeout sending data to {}: {}"
@@ -48,44 +47,70 @@ MSG_SEND_REQUEST_EXCEPTION = "Error sending data to {}: {}"
 MSG_SEND_UNEXPECTED_ERROR = "Unexpected error in send_data_to_server: {}"
 MSG_SEND_SKIPPING_JSON_ERROR = "Skipping data transmission due to JSON serialization error for logging."
 
-
 # --- General Error Messages ---
 MSG_UNEXPECTED_ERROR_MAIN_LOOP = "An unexpected error occurred in the main loop: {}"
 
+# --- Agent Startup Messages ---
+MSG_AGENT_STARTING = "Agent starting up..."
+MSG_AGENT_STOPPING = "Agent shutting down..."
 
-# Example of a function if formatting is more complex or needs logic
+# --- Helper Functions for Messages (Optional) ---
 def format_config_value_missing_info(key_name, section_name, default_value):
     return f"Info: Configuration key '{key_name}' in section '[{section_name}]' not found. Using default: '{default_value}'."
 
 def format_config_section_missing_info(section_name):
     return f"Info: Configuration section '[{section_name}]' not found. Using defaults for all its settings."
 
-def format_config_fallback_value(key_name, value_type, section_name="agent_settings"):
-    return f"Info: Using default {value_type} for '{key_name}' in section '[{section_name}]' due to missing or invalid value."
+# --- Setup Script Messages ---
+SETUP_HEADER = "--- Database Setup Script ---"
+SETUP_INTRO_MAIN = "This script will configure 'db_config.ini' with your existing application database details and then attempt to create the necessary tables within that database."
+SETUP_INTRO_ASSUMPTION_HEADER = "\nIMPORTANT: This script assumes you have already created a MariaDB database and a dedicated application user with FULL PRIVILEGES on that database."
+SETUP_INTRO_ASSUMPTION_DETAIL = "If not, please create them manually or use a separate admin script/tool.\n"
+SETUP_PRE_REQUISITE_DB_RUNNING = "Ensure your MariaDB server is running before proceeding.\n"
 
-# You can add more functions or constants as needed.
-# For example, for the initial "config file not found" or "error reading config"
-# the load_app_config function in agent.py already prints specific messages.
-# We can choose to centralize those too or leave them if they are very specific to that function's internals.
-# The provided MSG_CONFIG_FILE_NOT_FOUND and MSG_CONFIG_ERROR_READING are good general ones.
+SETUP_PROMPT_DB_HOST_DEFAULT = 'localhost'
+SETUP_PROMPT_DB_NAME_DEFAULT = 'agent_data_db'
+SETUP_PROMPT_DB_USER_DEFAULT = 'agent_app_user'
 
-MSG_CONFIG_USING_DEFAULTS_GENERAL = "Using default settings due to issues with configuration file."
+SETUP_ERROR_PASSWORD_EMPTY = "Password cannot be empty. Please try again."
+SETUP_ERROR_PASSWORD_MISMATCH = "Passwords do not match. Please try again."
 
-# For optional module import failures, the agent.py already prints specific messages.
-# These constants can be used to standardize them if desired.
-# Example: MSG_PSUTIL_INIT_ERROR = "Error initializing psutil: {}" (if psutil could have init errors beyond import)
+SETUP_SUMMARY_HEADER = "\n--- Summary of Provided Application DB Details ---"
+SETUP_SUMMARY_DB_HOST = "  Application DB Host:   {}"
+SETUP_SUMMARY_DB_NAME = "  Application DB Name:   {}"
+SETUP_SUMMARY_DB_USER = "  Application DB User:   {}"
+SETUP_SUMMARY_DB_PASSWORD_SET = "  Application DB Password: [set]" # Avoid printing password
+SETUP_SUMMARY_REVIEW_PROMPT_1 = "\nReview these details carefully. The script will attempt to connect to this database,"
+SETUP_SUMMARY_REVIEW_PROMPT_2 = "create the necessary tables, and then write these details to 'db_config.ini'."
 
-# For data payload:
-MSG_CPU_HIGH_THRESHOLD_PAYLOAD = "CPU usage {}% is above threshold {}%, including in payload."
-MSG_CPU_NORMAL_PAYLOAD = "CPU usage {}% is not above threshold {}%, value will be null in payload."
-MSG_GPU_HIGH_THRESHOLD_PAYLOAD = "GPU usage {}% is above threshold {}%, including in payload."
-MSG_GPU_NORMAL_PAYLOAD = "GPU usage {}% is not above threshold {}%, value will be null in payload."
-MSG_CPU_NOT_AVAILABLE_PAYLOAD = "CPU usage data not available (psutil error or not installed)."
-MSG_GPU_NOT_AVAILABLE_PAYLOAD = "GPU usage data not available (GPUtil error, no GPU, or not installed)."
+SETUP_ABORTED_BY_USER = "Database setup aborted by user."
 
-# Startup messages
-MSG_AGENT_STARTING = "Agent starting up..."
-MSG_AGENT_STOPPING = "Agent shutting down..." # For future graceful shutdown
-MSG_SERVER_REACHABLE_CHECK = "Checking server reachability at {}..." # If we add a startup check
-MSG_SERVER_REACHABLE_OK = "Server is reachable."
-MSG_SERVER_REACHABLE_FAIL = "Server not reachable: {}"
+SETUP_STEP1_HEADER = "\n--- Step 1: Attempting to connect to database '{}' on host '{}' as user '{}' to create tables..."
+SETUP_STEP1_CONNECT_SUCCESS = "Successfully connected to database '{}'."
+SETUP_STEP1_CREATING_TABLES = "Creating tables if they don't exist..."
+SETUP_STEP1_TABLES_SUCCESS = "Tables created/verified successfully in database '{}'."
+SETUP_STEP1_ERROR_ROLLBACK = "Transaction rolled back due to error."
+SETUP_STEP1_ERROR_ROLLBACK_FAILED = "Error during rollback attempt: {}"
+SETUP_STEP1_ERROR_TABLE_CREATION = "\nMariaDB Error occurred: {}" # Followed by guidance
+SETUP_STEP1_ERROR_TABLE_CREATION_UNEXPECTED = "An unexpected error occurred during table creation: {}"
+
+SETUP_GUIDANCE_HEADER = "Please ensure:"
+SETUP_GUIDANCE_DB_RUNNING = "  1. MariaDB server is running and accessible at '{}'."
+SETUP_GUIDANCE_DB_EXISTS = "  2. Database '{}' exists."
+SETUP_GUIDANCE_USER_EXISTS_PASSWORD = "  3. User '{}' exists and the provided password is correct."
+SETUP_GUIDANCE_USER_PERMISSIONS = "  4. User '{}' has necessary permissions (e.g., CREATE TABLE) on database '{}'."
+
+SETUP_STEP2_HEADER = "\n--- Step 2: Creating database configuration file 'db_config.ini' ---"
+SETUP_STEP2_DBCONFIG_CREATED = "'db_config.ini' created successfully."
+SETUP_STEP2_DBCONFIG_REMINDER_SECURE = "\nIMPORTANT: Secure the 'db_config.ini' file as it contains database credentials."
+SETUP_STEP2_DBCONFIG_REMINDER_GITIGNORE = "Consider adding it to .gitignore if this project is under version control and the file should not be committed."
+SETUP_STEP2_ERROR_DBCONFIG_WRITE = "Error writing 'db_config.ini': {}"
+
+SETUP_FINAL_SUCCESS_HEADER = "\n--- Database Configuration Script Completed Successfully! ---"
+SETUP_FINAL_SUCCESS_DETAIL = "Setup complete! 'db_config.ini' has been created/updated, and tables have been initialized/verified in database '{}'."
+SETUP_FINAL_SUCCESS_NEXT_STEP = "The server (server.py) should now be able to connect to database '{}' on host '{}' using user '{}'."
+
+# Messages for initial dependency checks in setup_database.py
+SETUP_ERROR_MARIADB_MODULE_IMPORT = "Error: MariaDB connector (python-mariadb) not found.\nPlease ensure it is installed for the Python environment this script is using.\nYou can typically install it with: pip install mariadb"
+SETUP_ERROR_SQLDDL_IMPORT = "Error: Could not import DDL statements from sql_ddl.py.\nEnsure sql_ddl.py is in the project root directory or accessible in PYTHONPATH."
+```

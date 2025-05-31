@@ -139,31 +139,43 @@ cd <repository_directory>
     ```bash
     pip install -r requirements_server.txt
     ```
-3.  **Set up MariaDB Database & Server Configuration:**
-    The project includes an interactive script to help set up the MariaDB database, create a dedicated application user, create the necessary tables, and configure the server's database connection.
-
+3.  **Prepare MariaDB Database and User (Manual Step by DBA)**:
+    *   **Important**: Before running the setup script, a MariaDB database and a dedicated application user must be created manually by a Database Administrator.
+    *   Connect to your MariaDB server using an admin account (e.g., `root`).
+    *   Create the database if it doesn't exist (e.g., `agent_data_db`):
+        ```sql
+        CREATE DATABASE agent_data_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        ```
+    *   Create the application user if it doesn't exist and grant it **all necessary privileges** on the created database. Replace placeholders with your desired username and a strong password. The user should be able to connect from the host where `server.py` will run (e.g., `localhost` or a specific IP).
+        ```sql
+        CREATE USER 'your_app_user'@'localhost' IDENTIFIED BY 'your_app_password';
+        GRANT ALL PRIVILEGES ON agent_data_db.* TO 'your_app_user'@'localhost';
+        -- Or, more granularly:
+        -- GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER ON agent_data_db.* TO 'your_app_user'@'localhost';
+        FLUSH PRIVILEGES;
+        ```
+4.  **Run Database Setup Script (for Table Creation & Server Config)**:
+    The project includes an interactive script to create the necessary tables within your existing database and to generate the `db_config.ini` file that `server.py` uses.
     1.  **Ensure your MariaDB server is running and accessible.**
     2.  **Run the database setup script from the project root directory:**
         ```bash
         python setup_database.py
         ```
     3.  **Follow the on-screen prompts:**
-        *   You will be asked for your MariaDB **admin** credentials (a user with privileges to create databases and new users, e.g., 'root'). This is only for the setup script's operations.
-        *   You will then be asked to define:
-            *   The **name for the application's database** (default: `agent_data_db`).
-            *   A **username for the application** to use when connecting to this database (default: `agent_app_user`).
-            *   The **host from which this application user will connect** (default: `localhost`).
-            *   A **password for this new application user**.
-        *   The script will then perform the following actions:
-            *   Create the application database if it doesn't exist.
-            *   Create the application user if it doesn't exist and grant it necessary privileges on the application database.
-            *   Create all required tables (`computer_groups`, `computers`, `activity_logs`) within the application database using definitions from `sql_ddl.py`.
+        *   You will be asked for the details of your **existing** application database setup:
+            *   The **MariaDB host** where the application database is located (default: `localhost`).
+            *   The **name of the existing application database** (default: `agent_data_db`).
+            *   The **username of the existing application user** (default: `agent_app_user`).
+            *   The **password for this application user**.
+        *   The script will then perform the following actions using these credentials:
+            *   Connect to the specified database.
+            *   Create all required tables (`computer_groups`, `computers`, `activity_logs`) if they don't already exist, using definitions from `sql_ddl.py`.
             *   Generate a `db_config.ini` file in the project root. This file will store the connection details (host, database name, application username, and password) that `server.py` will use.
 
-4.  **Secure `db_config.ini`:**
+5.  **Secure `db_config.ini`:**
     *   The `db_config.ini` file contains sensitive database credentials. Ensure it is appropriately secured and **should not be committed to version control** if you are using Git (consider adding `db_config.ini` to your `.gitignore` file).
 
-The `server.py` application is now configured to read its database connection details from `db_config.ini`. You should no longer need to edit database credentials directly within `server.py`. The server will also attempt to create tables on startup if they are missing, using the credentials from `db_config.ini`.
+The `server.py` application is now configured to read its database connection details from `db_config.ini`.
 
 ## Usage
 
