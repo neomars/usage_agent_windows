@@ -95,4 +95,47 @@ footer {
     border-radius: 4px;
 }
 
+/* Alerts Styling */
+.alerts-list {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 10px;
+}
+
+.alert-item {
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border: 1px solid transparent; /* Base for border */
+    font-size: 0.9em;
+}
+
+.alert-item strong { /* Computer name or Alert Type */
+    font-weight: bold;
+}
+
+.alert-icon {
+    margin-right: 8px;
+    font-size: 1.1em; /* Make icon slightly larger */
+}
+
+/* Specific Alert Type Styling */
+.alert-offline {
+    background-color: #fff3cd; /* Light yellow (Bootstrap warning) */
+    border-color: #ffeeba;
+    color: #856404;
+}
+
+.alert-high-cpu-usage {
+    background-color: #f8d7da; /* Light red (Bootstrap danger) */
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.alert-high-gpu-usage {
+    background-color: #ffcc80; /* Light orange - distinct from CPU */
+    border-color: #ffbf60;
+    color: #854c00;
+}
+
 /* Add more styles as needed */

@@ -4,7 +4,7 @@
 
 {% block head %}
     {{ super() }}
-    {# Add any additional head content specific to the dashboard page here #}
+    {# Specific dashboard CSS or JS links could go here if needed in future #}
 {% endblock %}
 
 {% block content %}
@@ -43,8 +43,23 @@
 
         <div id="alerts-view" class="dashboard-half">
             <h3>Alerts</h3>
-            <p>Active alerts and important notifications will appear here.</p>
-            {# Placeholder for alerts list or summary cards #}
+            {% if alerts %}
+                <ul class="alerts-list">
+                    {% for alert in alerts %}
+                    <li class="alert-item alert-{{ alert.alert_type | lower | replace(' ', '-') }}">
+                        <span class="alert-icon">
+                            {% if alert.alert_type == 'Offline' %}⚠️{% elif alert.alert_type == 'High CPU Usage' %}🔥{% elif alert.alert_type == 'High GPU Usage' %}🌡️{% else %}🔴{% endif %}
+                        </span>
+                        <strong>{{ alert.netbios_name }}</strong>
+                        {% if alert.ip_address and alert.ip_address != 'N/A' %}({{ alert.ip_address }}){% endif %} -
+                        Type: <strong>{{ alert.alert_type }}</strong> -
+                        Details: {{ alert.details }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No active alerts.</p>
+            {% endif %}
         </div>
     </div>
 {% endblock %}

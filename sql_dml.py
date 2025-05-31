@@ -34,12 +34,21 @@ SELECT_COMPUTERS_FOR_DASHBOARD = """
 # Added c.id and g.id to the dashboard query for potential future use (e.g., linking to detail pages)
 
 
+# --- Queries for Alerts (for dashboard) ---
+SELECT_LATEST_ACTIVITY_FOR_COMPUTER = """
+    SELECT cpu_usage_percent, gpu_usage_percent, timestamp
+    FROM activity_logs
+    WHERE computer_id = %s
+    ORDER BY timestamp DESC
+    LIMIT 1
+"""
+
 # --- Queries for Alerts (Conceptual - for future implementation) ---
 # These are examples and may need adjustment or different approaches.
 
 # Example: Get latest activity log for each computer to check recent stats
 # This is complex and often better handled by application logic after fetching recent logs.
-# SELECT_LATEST_ACTIVITY_FOR_COMPUTER = """
+# SELECT_LATEST_ACTIVITY_FOR_COMPUTER_FULL_ROW = """
 #    SELECT * FROM activity_logs al
 #    WHERE al.computer_id = %s
 #    ORDER BY al.timestamp DESC
@@ -63,3 +72,4 @@ SELECT_COMPUTERS_FOR_DASHBOARD = """
 # Note: The dashboard alert section will likely involve more specific queries
 # or processing of data fetched by more general queries.
 # For now, these are just conceptual placeholders.
+```
