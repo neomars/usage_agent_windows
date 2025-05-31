@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta # Added timedelta
 import sql_ddl  # Import DDL statements
 import sql_dml  # Import DML statements
 
@@ -9,6 +9,11 @@ DB_HOST = 'localhost'
 DB_USER = 'your_db_user'
 DB_PASSWORD = 'your_db_password'
 DB_NAME = 'agent_data_db'
+
+# --- Alert Thresholds (Constants) ---
+CPU_ALERT_THRESHOLD = 90.0
+GPU_ALERT_THRESHOLD = 90.0
+OFFLINE_THRESHOLD_MINUTES = 30
 
 # --- Attempt to import MariaDB connector ---
 try:
@@ -69,32 +74,80 @@ def dashboard_page():
     conn = None
     cursor = None
     computer_list = []
+    alerts = [] # Initialize alerts list
     error_message = None
 
     try:
         conn = get_db_connection()
         if conn:
             cursor = conn.cursor()
-            cursor.execute(sql_dml.SELECT_COMPUTERS_FOR_DASHBOARD) # Use DML constant
+            # Fetch computer list
+            cursor.execute(sql_dml.SELECT_COMPUTERS_FOR_DASHBOARD)
             rows = cursor.fetchall()
+            now = datetime.now() # Get current time once for offline checks
+
             for row in rows:
-                computer_list.append({
-                    'id': row[0], # Added from enhanced DML query
+                computer_data = {
+                    'id': row[0],
                     'netbios_name': row[1],
                     'ip_address': row[2],
                     'last_seen': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else 'Never',
                     'group_name': row[4],
-                    'group_id': row[5] # Added from enhanced DML query
-                })
+                    'group_id': row[5]
+                }
+                computer_list.append(computer_data)
+
+                # Offline Alert Check
+                if row[3]: # If last_seen is not NULL
+                    last_seen_dt = row[3] # This is already a datetime object from the DB
+                    if now - last_seen_dt > timedelta(minutes=OFFLINE_THRESHOLD_MINUTES):
+                        alerts.append({
+                            'netbios_name': computer_data['netbios_name'],
+                            'ip_address': computer_data['ip_address'],
+                            'alert_type': 'Offline',
+                            'details': f"Last seen: {computer_data['last_seen']}"
+                        })
+                elif computer_data['last_seen'] == 'Never': # Explicitly 'Never' means no logs yet
+                     alerts.append({
+                        'netbios_name': computer_data['netbios_name'],
+                        'ip_address': computer_data['ip_address'],
+                        'alert_type': 'Offline',
+                        'details': "Never seen (no activity logs yet)"
+                    })
+
+
+                # CPU/GPU Alert Check (Strategy A: Query per computer)
+                cursor.execute(sql_dml.SELECT_LATEST_ACTIVITY_FOR_COMPUTER, (computer_data['id'],))
+                latest_log = cursor.fetchone()
+
+                if latest_log:
+                    cpu_usage = latest_log[0]
+                    gpu_usage = latest_log[1]
+                    log_timestamp = latest_log[2].strftime('%Y-%m-%d %H:%M:%S') if latest_log[2] else 'N/A'
+
+                    if cpu_usage is not None and cpu_usage > CPU_ALERT_THRESHOLD:
+                        alerts.append({
+                            'netbios_name': computer_data['netbios_name'],
+                            'ip_address': computer_data['ip_address'],
+                            'alert_type': 'High CPU Usage',
+                            'details': f"CPU at {cpu_usage:.1f}% on {log_timestamp}"
+                        })
+                    if gpu_usage is not None and gpu_usage > GPU_ALERT_THRESHOLD:
+                        alerts.append({
+                            'netbios_name': computer_data['netbios_name'],
+                            'ip_address': computer_data['ip_address'],
+                            'alert_type': 'High GPU Usage',
+                            'details': f"GPU at {gpu_usage:.1f}% on {log_timestamp}"
+                        })
         else:
             error_message = "Database connection failed. Cannot load computer data."
             print(error_message)
 
     except mariadb.Error as e:
-        error_message = f"Database error fetching computer data: {e}"
+        error_message = f"Database error fetching data for dashboard: {e}"
         print(error_message)
     except Exception as e:
-        error_message = f"An unexpected error occurred fetching computer data: {e}"
+        error_message = f"An unexpected error occurred fetching data for dashboard: {e}"
         print(error_message)
     finally:
         if cursor:
@@ -102,7 +155,7 @@ def dashboard_page():
         if conn:
             conn.close()
 
-    return render_template('dashboard.html', computers=computer_list, error_message=error_message)
+    return render_template('dashboard.html', computers=computer_list, alerts=alerts, error_message=error_message)
 
 # --- API Routes ---
 @app.route('/log_activity', methods=['POST'])
