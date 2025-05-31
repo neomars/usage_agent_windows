@@ -1,6 +1,8 @@
-from flask import Flask, request, jsonify, render_template # Added render_template
+from flask import Flask, request, jsonify, render_template
 import sys
 from datetime import datetime
+import sql_ddl  # Import DDL statements
+import sql_dml  # Import DML statements
 
 # --- MariaDB Configuration ---
 DB_HOST = 'localhost'
@@ -15,15 +17,13 @@ except ImportError:
     print("Error: MariaDB connector (python-mariadb) not found. This server requires it.")
     print("Please install it: pip install mariadb")
     mariadb = None
-    # Consider sys.exit("MariaDB connector not found. Server cannot start.") for critical DB dependency
 
-app = Flask(__name__) # Flask will look for 'templates' and 'static' folders in the same directory
+app = Flask(__name__)
 
 # --- Database Connection Function ---
 def get_db_connection():
     """Establishes a connection to the MariaDB database."""
     if not mariadb:
-        # print("Cannot connect to DB: MariaDB connector not available.") # Can be noisy
         return None
     try:
         conn = mariadb.connect(
@@ -39,49 +39,18 @@ def get_db_connection():
 
 # --- Database Schema Creation Function ---
 def create_tables(conn):
-    """Creates database tables if they don't already exist."""
+    """Creates database tables if they don't already exist using DDL from sql_ddl.py."""
     if not conn:
-        # print("Cannot create tables: No database connection.") # Can be noisy
         return
     cursor = None
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS computer_groups (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL UNIQUE,
-                description TEXT
-            ) ENGINE=InnoDB;
-        """)
-        # print("Table 'computer_groups' checked/created successfully.")
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS computers (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                netbios_name VARCHAR(255) NOT NULL UNIQUE,
-                ip_address VARCHAR(45),
-                last_seen DATETIME,
-                group_id INT,
-                FOREIGN KEY (group_id) REFERENCES computer_groups(id) ON DELETE SET NULL
-            ) ENGINE=InnoDB;
-        """)
-        # print("Table 'computers' checked/created successfully.")
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS activity_logs (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                computer_id INT NOT NULL,
-                timestamp DATETIME NOT NULL,
-                free_disk_space_gb FLOAT,
-                cpu_usage_percent FLOAT,
-                gpu_usage_percent FLOAT,
-                active_window_title VARCHAR(512),
-                FOREIGN KEY (computer_id) REFERENCES computers(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB;
-        """)
-        # print("Table 'activity_logs' checked/created successfully.")
+        for table_ddl in sql_ddl.ALL_TABLES_DDL:
+            cursor.execute(table_ddl)
         conn.commit()
-        print("Database tables initialized/verified successfully.")
+        print("Database tables initialized/verified successfully using sql_ddl.py.")
     except mariadb.Error as e:
-        print(f"Error creating tables: {e}")
+        print(f"Error creating tables using sql_ddl.py: {e}")
         if conn:
             try:
                 conn.rollback()
@@ -106,44 +75,39 @@ def dashboard_page():
         conn = get_db_connection()
         if conn:
             cursor = conn.cursor()
-            sql = """
-                SELECT c.netbios_name, c.ip_address, c.last_seen, IFNULL(g.name, 'N/A') as group_name
-                FROM computers c
-                LEFT JOIN computer_groups g ON c.group_id = g.id
-                ORDER BY c.last_seen DESC, c.netbios_name;
-            """
-            cursor.execute(sql)
+            cursor.execute(sql_dml.SELECT_COMPUTERS_FOR_DASHBOARD) # Use DML constant
             rows = cursor.fetchall()
             for row in rows:
                 computer_list.append({
-                    'netbios_name': row[0],
-                    'ip_address': row[1],
-                    'last_seen': row[2].strftime('%Y-%m-%d %H:%M:%S') if row[2] else 'Never', # Format datetime
-                    'group_name': row[3]
+                    'id': row[0], # Added from enhanced DML query
+                    'netbios_name': row[1],
+                    'ip_address': row[2],
+                    'last_seen': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else 'Never',
+                    'group_name': row[4],
+                    'group_id': row[5] # Added from enhanced DML query
                 })
         else:
             error_message = "Database connection failed. Cannot load computer data."
-            print(error_message) # Log to server console
+            print(error_message)
 
     except mariadb.Error as e:
         error_message = f"Database error fetching computer data: {e}"
-        print(error_message) # Log to server console
+        print(error_message)
     except Exception as e:
         error_message = f"An unexpected error occurred fetching computer data: {e}"
-        print(error_message) # Log to server console
+        print(error_message)
     finally:
         if cursor:
             cursor.close()
         if conn:
             conn.close()
 
-    # The BLAZE_ വർഷം placeholder in base.html will be replaced by current_year from context_processor
     return render_template('dashboard.html', computers=computer_list, error_message=error_message)
 
-# --- API Routes --- # This was the original comment, ensuring it's correct
+# --- API Routes ---
 @app.route('/log_activity', methods=['POST'])
 def log_activity():
-    data = request.get_json(silent=True) # Added silent=True
+    data = request.get_json(silent=True)
 
     if not data:
         return jsonify(status="error", message="Invalid JSON payload"), 400
@@ -164,33 +128,21 @@ def log_activity():
 
         cursor = conn.cursor()
 
-        # Upsert computer
-        cursor.execute("SELECT id FROM computers WHERE netbios_name = %s", (data['netbios_name'],))
+        cursor.execute(sql_dml.SELECT_COMPUTER_BY_NETBIOS, (data['netbios_name'],))
         result = cursor.fetchone()
 
         if result:
             computer_id = result[0]
-            cursor.execute("""
-                UPDATE computers SET ip_address = %s, last_seen = NOW()
-                WHERE id = %s
-            """, (data['ip_address'], computer_id))
+            cursor.execute(sql_dml.UPDATE_COMPUTER_LAST_SEEN_IP, (data['ip_address'], computer_id))
         else:
-            cursor.execute("""
-                INSERT INTO computers (netbios_name, ip_address, last_seen)
-                VALUES (%s, %s, NOW())
-            """, (data['netbios_name'], data['ip_address']))
+            cursor.execute(sql_dml.INSERT_NEW_COMPUTER, (data['netbios_name'], data['ip_address']))
             computer_id = cursor.lastrowid
 
         if not computer_id:
             conn.rollback()
             return jsonify(status="error", message="Failed to obtain computer ID"), 500
 
-        # Insert activity log
-        cursor.execute("""
-            INSERT INTO activity_logs (computer_id, timestamp, free_disk_space_gb,
-                                     cpu_usage_percent, gpu_usage_percent, active_window_title)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
+        cursor.execute(sql_dml.INSERT_ACTIVITY_LOG, (
             computer_id,
             data.get('timestamp'),
             data.get('free_disk_space_gb'),
@@ -237,12 +189,7 @@ def create_group():
             return jsonify(status="error", message="Database connection failed"), 500
 
         cursor = conn.cursor()
-
-        cursor.execute("""
-            INSERT INTO computer_groups (name, description)
-            VALUES (%s, %s)
-        """, (group_name, description if description else None))
-
+        cursor.execute(sql_dml.INSERT_NEW_GROUP, (group_name, description if description else None))
         conn.commit()
         return jsonify(status="success", message="Group created successfully", group_name=group_name), 201
 
@@ -281,7 +228,7 @@ def list_groups():
             return jsonify(status="error", message="Database connection failed"), 500
 
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, description FROM computer_groups ORDER BY name")
+        cursor.execute(sql_dml.SELECT_ALL_GROUPS)
         rows = cursor.fetchall()
 
         for row in rows:
@@ -325,16 +272,14 @@ def assign_computer_to_group(netbios_name):
 
         cursor = conn.cursor()
 
-        # Find Computer ID
-        cursor.execute("SELECT id FROM computers WHERE netbios_name = %s", (netbios_name,))
+        cursor.execute(sql_dml.SELECT_COMPUTER_BY_NETBIOS, (netbios_name,))
         computer_result = cursor.fetchone()
         if not computer_result:
             return jsonify(status="error", message=f"Computer with NetBIOS name '{netbios_name}' not found."), 404
         computer_id = computer_result[0]
 
-        # Determine Target Group ID
         if 'group_id' in data:
-            if data['group_id'] is None: # Explicitly unassign
+            if data['group_id'] is None:
                 target_group_id = None
             else:
                 try:
@@ -346,7 +291,7 @@ def assign_computer_to_group(netbios_name):
 
         elif 'group_name' in data and data['group_name'] is not None and data['group_name'].strip() != "":
             group_name_to_find = data['group_name'].strip()
-            cursor.execute("SELECT id FROM computer_groups WHERE name = %s", (group_name_to_find,))
+            cursor.execute(sql_dml.SELECT_GROUP_BY_NAME, (group_name_to_find,))
             group_result = cursor.fetchone()
             if not group_result:
                 return jsonify(status="error", message=f"Group with name '{group_name_to_find}' not found."), 404
@@ -356,9 +301,7 @@ def assign_computer_to_group(netbios_name):
         else:
             return jsonify(status="error", message="Missing group identifier ('group_id' or 'group_name')."), 400
 
-
-        # Update computer's group_id
-        cursor.execute("UPDATE computers SET group_id = %s WHERE id = %s", (target_group_id, computer_id))
+        cursor.execute(sql_dml.UPDATE_COMPUTER_GROUP_ID, (target_group_id, computer_id))
         conn.commit()
 
         action = "assigned to group" if target_group_id is not None else "unassigned from group"
@@ -390,7 +333,6 @@ if __name__ == '__main__':
         print("Critical: MariaDB connector not found or failed to import. Server cannot proceed with DB operations.")
         sys.exit("Exiting: MariaDB connector is essential and not available.")
 
-    # Add current_year to the default context for all templates
     @app.context_processor
     def inject_current_year():
         return {'current_year': datetime.utcnow().year}
@@ -408,7 +350,6 @@ if __name__ == '__main__':
         else:
             print("CRITICAL: Failed to connect to MariaDB for initial setup. Tables may not be created.")
             print("Ensure MariaDB is running, accessible, and credentials/database name are correct.")
-            # sys.exit("Exiting: Database connection failed at startup, cannot verify/create tables.")
     except Exception as e:
         print(f"An unexpected error occurred during database setup: {e}")
     finally:
