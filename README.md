@@ -139,30 +139,31 @@ cd <repository_directory>
     ```bash
     pip install -r requirements_server.txt
     ```
-3.  **Set up MariaDB Database:**
-    *   Connect to your MariaDB server.
-    *   Create a database for the application, e.g., `agent_data_db`.
-        ```sql
-        CREATE DATABASE agent_data_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+3.  **Set up MariaDB Database & Server Configuration:**
+    The project includes an interactive script to help set up the MariaDB database, create a dedicated application user, create the necessary tables, and configure the server's database connection.
+
+    1.  **Ensure your MariaDB server is running and accessible.**
+    2.  **Run the database setup script from the project root directory:**
+        ```bash
+        python setup_database.py
         ```
-    *   Create a database user and grant it permissions to this database. Replace `'your_server_user'` and `'your_server_password'` with strong credentials.
-        ```sql
-        CREATE USER 'your_server_user'@'localhost' IDENTIFIED BY 'your_server_password';
-        GRANT ALL PRIVILEGES ON agent_data_db.* TO 'your_server_user'@'localhost';
-        FLUSH PRIVILEGES;
-        ```
-        (Adjust `'localhost'` if your server application will connect from a different host relative to the MariaDB server).
-4.  **Configure Server Database Connection:**
-    *   Open `server.py`.
-    *   Locate the database configuration section at the top of the file:
-        ```python
-        DB_HOST = 'localhost'
-        DB_USER = 'your_db_user' # Replace with your MariaDB username
-        DB_PASSWORD = 'your_db_password' # Replace with your MariaDB password
-        DB_NAME = 'agent_data_db' # Should match the database you created
-        ```
-    *   Update `DB_USER`, `DB_PASSWORD`, and `DB_NAME` (if different) to match your MariaDB setup.
-    *   **Note**: For production, it's highly recommended to use environment variables or a separate configuration file for these sensitive details instead of hardcoding them in `server.py`.
+    3.  **Follow the on-screen prompts:**
+        *   You will be asked for your MariaDB **admin** credentials (a user with privileges to create databases and new users, e.g., 'root'). This is only for the setup script's operations.
+        *   You will then be asked to define:
+            *   The **name for the application's database** (default: `agent_data_db`).
+            *   A **username for the application** to use when connecting to this database (default: `agent_app_user`).
+            *   The **host from which this application user will connect** (default: `localhost`).
+            *   A **password for this new application user**.
+        *   The script will then perform the following actions:
+            *   Create the application database if it doesn't exist.
+            *   Create the application user if it doesn't exist and grant it necessary privileges on the application database.
+            *   Create all required tables (`computer_groups`, `computers`, `activity_logs`) within the application database using definitions from `sql_ddl.py`.
+            *   Generate a `db_config.ini` file in the project root. This file will store the connection details (host, database name, application username, and password) that `server.py` will use.
+
+4.  **Secure `db_config.ini`:**
+    *   The `db_config.ini` file contains sensitive database credentials. Ensure it is appropriately secured and **should not be committed to version control** if you are using Git (consider adding `db_config.ini` to your `.gitignore` file).
+
+The `server.py` application is now configured to read its database connection details from `db_config.ini`. You should no longer need to edit database credentials directly within `server.py`. The server will also attempt to create tables on startup if they are missing, using the credentials from `db_config.ini`.
 
 ## Usage
 
@@ -179,7 +180,7 @@ cd <repository_directory>
     python server.py
     ```
 4.  By default, the server will run on `http://0.0.0.0:5000/`.
-    *   It will attempt to create the necessary database tables in your configured MariaDB database on its first run if they don't already exist.
+    *   It will attempt to create the necessary database tables in your configured MariaDB database on its first run if they don't already exist (using credentials from `db_config.ini`).
     *   You should see output indicating the server is running, e.g., `* Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)`.
 
 ### 2. Running the Agent
