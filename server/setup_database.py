@@ -3,19 +3,29 @@ import getpass
 import configparser
 import sys
 import os
-import messages # Import the new messages module
-
+# Use relative imports for sibling modules when script is in a subdirectory
+from . import messages_server as messages
 try:
     import mariadb
 except ImportError:
-    print(messages.SETUP_ERROR_MARIADB_MODULE_IMPORT)
+    print(messages.SETUP_ERROR_MARIADB_MODULE_IMPORT) # This message comes from messages_server
     sys.exit(1)
 
 try:
-    from sql_ddl import ALL_TABLES_DDL
+    from .sql_ddl import ALL_TABLES_DDL # Relative import
 except ImportError:
+    # This error message itself should ideally come from messages_server too,
+    # but messages_server might not be imported yet if sql_ddl import fails first.
+    # For now, keeping it simple or assuming messages_server is imported before this.
+    # The messages_server import is at the top, so it should be available.
     print(messages.SETUP_ERROR_SQLDDL_IMPORT)
     sys.exit(1)
+
+# Determine the directory where this script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Define the path for db_config.ini relative to the script's location (i.e., in server/)
+DB_CONFIG_PATH = os.path.join(SCRIPT_DIR, 'db_config.ini')
+
 
 def setup_database():
     print(messages.SETUP_HEADER)
@@ -87,7 +97,7 @@ def setup_database():
             except mariadb.Error as rb_err:
                 print(messages.SETUP_STEP1_ERROR_ROLLBACK_FAILED.format(rb_err))
 
-        print(messages.SETUP_STEP1_ERROR_TABLE_CREATION.format(e)) # Original MariaDB error
+        print(messages.SETUP_STEP1_MARIADB_ERROR.format(e)) # Using the new generic MariaDB error
         print(messages.SETUP_GUIDANCE_HEADER)
         print(messages.SETUP_GUIDANCE_DB_RUNNING.format(app_db_host))
         print(messages.SETUP_GUIDANCE_DB_EXISTS.format(app_db_name))
@@ -117,17 +127,18 @@ def setup_database():
     }
 
     try:
-        with open('db_config.ini', 'w') as configfile:
+        # Use DB_CONFIG_PATH to write db_config.ini inside server/ directory
+        with open(DB_CONFIG_PATH, 'w') as configfile:
             config.write(configfile)
-        print(messages.SETUP_STEP2_DBCONFIG_CREATED)
+        print(messages.SETUP_STEP2_DBCONFIG_CREATED.format(DB_CONFIG_PATH)) # Inform user of location
         print(messages.SETUP_STEP2_DBCONFIG_REMINDER_SECURE)
         print(messages.SETUP_STEP2_DBCONFIG_REMINDER_GITIGNORE)
     except IOError as e:
-        print(messages.SETUP_STEP2_ERROR_DBCONFIG_WRITE.format(e))
+        print(messages.SETUP_STEP2_ERROR_DBCONFIG_WRITE.format(DB_CONFIG_PATH, e)) # Include path in error
         sys.exit(1)
 
     print(messages.SETUP_FINAL_SUCCESS_HEADER)
-    print(messages.SETUP_FINAL_SUCCESS_DETAIL.format(app_db_name))
+    print(messages.SETUP_FINAL_SUCCESS_DETAIL.format(DB_CONFIG_PATH, app_db_name)) # Include path
     print(messages.SETUP_FINAL_SUCCESS_NEXT_STEP.format(app_db_name, app_db_host, app_db_user))
 
 if __name__ == "__main__":

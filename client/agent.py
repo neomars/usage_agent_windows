@@ -5,7 +5,7 @@ import socket
 import shutil
 import json
 from datetime import datetime
-import messages # Import the new messages module
+import messages_agent as messages # Updated import
 
 # --- Attempt to import optional modules ---
 try:
@@ -90,7 +90,6 @@ def get_gpu_usage():
     try:
         gpus = GPUtil.getGPUs()
         if not gpus:
-            # This specific info message is already in messages.py, used in main()
             return None
         return gpus[0].load * 100
     except Exception as e:
@@ -117,7 +116,7 @@ def load_app_config():
     Returns a dictionary of configuration settings.
     """
     parser = configparser.ConfigParser()
-    config_file = 'config.ini'
+    config_file = 'config.ini' # Assumes agent.py is run from client/ directory
 
     defaults = {
         'server_address': None,
@@ -139,10 +138,6 @@ def load_app_config():
         gpu_threshold = parser.getint('agent_settings', 'gpu_alert_threshold', fallback=defaults['gpu_alert_threshold'])
         log_folder = parser.get('agent_settings', 'log_folder', fallback=defaults['log_folder'])
 
-        # Optional: Print info about defaults being used if specific keys were missing
-        # This can be done by comparing parser.has_option with the returned value.
-        # For now, the broad error message or file not found is considered sufficient.
-
         return {
             'server_address': server_address,
             'cpu_alert_threshold': cpu_threshold,
@@ -158,13 +153,20 @@ def load_app_config():
 def log_data_to_file(log_path, data_json_string):
     """Appends a JSON string to the specified log file."""
     try:
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        # Ensure log directory exists (e.g., if log_folder is client/logs or ./logs)
+        # os.path.dirname will correctly handle paths like '.' or 'logs'
+        log_dir = os.path.dirname(log_path)
+        if log_dir and not os.path.exists(log_dir): # Check if log_dir is not empty string
+             os.makedirs(log_dir, exist_ok=True)
+        elif not log_dir and not os.path.exists(log_path) and not os.path.isdir(log_path): # Handle case where log_path is just filename in current dir
+             pass # No directory to create if log_dir is empty (current directory)
+
         with open(log_path, 'a') as f:
             f.write(data_json_string + '\n')
-    except IOError as e: # More specific for file open/write issues
+    except IOError as e:
         print(messages.MSG_LOG_FILE_WRITING_ERROR.format(log_path, e))
     except Exception as e:
-        print(messages.MSG_LOG_PATH_ERROR.format(os.path.dirname(log_path), e))
+        print(messages.MSG_LOG_PATH_ERROR.format(log_path, e)) # Changed to log_path for better error
 
 
 def send_data_to_server(server_address, json_payload):
@@ -172,7 +174,7 @@ def send_data_to_server(server_address, json_payload):
     Sends the JSON payload to the specified server address.
     Returns True on success (2xx response), False otherwise.
     """
-    if not requests_available: # Should not be called if false, but defensive.
+    if not requests_available:
         return False
 
     url = f"http://{server_address}/log_activity"
@@ -181,7 +183,7 @@ def send_data_to_server(server_address, json_payload):
     try:
         response = requests.post(url, data=json_payload, headers=headers, timeout=10)
         response.raise_for_status()
-        print(messages.MSG_SENDING_DATA_TO_SERVER.format(url, response.status_code)) # Using the more specific success message
+        print(messages.MSG_SENDING_DATA_TO_SERVER.format(url, response.status_code))
         return True
     except requests.exceptions.HTTPError as e:
         print(messages.MSG_SEND_HTTP_ERROR.format(url, e))
@@ -199,7 +201,7 @@ def send_data_to_server(server_address, json_payload):
 # --- Main Application ---
 def main():
     """Main function for the agent."""
-    print(messages.MSG_AGENT_STARTING) # Added agent starting message
+    print(messages.MSG_AGENT_STARTING)
     app_config = load_app_config()
 
     print(messages.MSG_CONFIG_LOADED_HEADER)
@@ -214,39 +216,37 @@ def main():
     if not server_address:
         print(messages.MSG_SERVER_ADDRESS_NOT_CONFIGURED)
     elif not requests_available:
-        # This message is already printed when requests import fails.
-        # Redundant here unless we want to emphasize it again in context of server_address being present.
-        # For now, relying on the import-time message.
-        pass
+        pass # Message already printed at import time
 
-
-    if GPUtil and not GPUtil.getGPUs() and GPUtil is not None : # Check GPUtil is not None before using it
+    if GPUtil and not GPUtil.getGPUs() and GPUtil is not None :
         print(messages.MSG_GPUTIL_NO_GPUS)
 
     log_folder_base = app_config.get('log_folder', '.')
-    # Initial log path for the first message (if any) about where logs are going.
-    # This might be slightly off if agent starts exactly at midnight and day changes before first log.
-    # But generally ok for an initial print.
     initial_log_file_name = datetime.now().strftime('%y%m%d') + 'Log_Usage_Windows.log'
     initial_log_path = os.path.join(log_folder_base, initial_log_file_name)
+    # Ensure initial log directory exists before first log message about it
+    try:
+        if log_folder_base and not os.path.exists(log_folder_base):
+            os.makedirs(log_folder_base, exist_ok=True)
+    except Exception as e:
+        print(messages.MSG_LOG_PATH_ERROR.format(log_folder_base, e))
+
     print(messages.MSG_LOGGING_TO_FILE.format(initial_log_path))
 
-
-    last_logged_day_str = "" # To track when the day changes for logging message
+    last_logged_day_str = ""
 
     while True:
-        try: # Added try-except for the main loop
+        try:
             current_time = datetime.now()
             current_day_str = current_time.strftime('%y%m%d')
 
             log_file_name_only = current_day_str + 'Log_Usage_Windows.log'
             current_log_path = os.path.join(log_folder_base, log_file_name_only)
 
-            if current_day_str != last_logged_day_str and last_logged_day_str != "": # Avoid printing on first ever loop
+            if current_day_str != last_logged_day_str and last_logged_day_str != "":
                 print(messages.MSG_LOG_FILE_DAILY_CHANGE.format(current_log_path))
             last_logged_day_str = current_day_str
 
-            # Data Collection
             netbios_name = get_netbios_name()
             ip_address = get_ip_address()
             free_space_gb_val = get_free_disk_space('C:\\')
@@ -256,7 +256,6 @@ def main():
             gpu_val = get_gpu_usage()
             active_title = get_active_window_title()
 
-            # Prepare data payload
             data_payload = {
                 "timestamp": current_time.isoformat(),
                 "netbios_name": netbios_name,
@@ -277,7 +276,6 @@ def main():
                 if gpu_val > app_config.get('gpu_alert_threshold', 90):
                     data_payload["gpu_usage_percent"] = gpu_rounded
 
-            # Log data locally
             json_data_for_log = None
             try:
                 json_data_for_log = json.dumps(data_payload)
@@ -286,7 +284,6 @@ def main():
                 print(messages.MSG_JSON_SERIALIZATION_ERROR.format(e, data_payload))
                 json_data_for_log = None
 
-            # Send data to server
             if server_address and requests_available and json_data_for_log:
                 send_data_to_server(server_address, json_data_for_log)
             elif server_address and requests_available and not json_data_for_log:
@@ -295,10 +292,7 @@ def main():
             time.sleep(30)
         except Exception as e:
             print(messages.MSG_UNEXPECTED_ERROR_MAIN_LOOP.format(e))
-            # Decide on recovery strategy: continue, exit, or wait longer?
-            # For now, just print and wait before retrying loop to avoid rapid-fire errors.
             time.sleep(60)
-
 
 if __name__ == "__main__":
     main()
