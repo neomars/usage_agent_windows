@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    {# Add any additional head content specific to the dashboard page here #}
+{% endblock %}
+
+{% block content %}
+    <h2>Main Dashboard Overview</h2>
+
+    <div class="dashboard-container">
+        <div id="computer-view" class="dashboard-half">
+            <h3>Computers</h3>
+            {% if error_message %}
+                <p class="error-message">Error: {{ error_message }}</p>
+            {% elif computers and computers|length > 0 %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>NetBIOS Name</th>
+                            <th>IP Address</th>
+                            <th>Last Seen</th>
+                            <th>Group</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for computer in computers %}
+                        <tr>
+                            <td>{{ computer.netbios_name }}</td>
+                            <td>{{ computer.ip_address }}</td>
+                            <td>{{ computer.last_seen }}</td>
+                            <td>{{ computer.group_name }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No computers found or data is currently unavailable.</p>
+            {% endif %}
+        </div>
+
+        <div id="alerts-view" class="dashboard-half">
+            <h3>Alerts</h3>
+            <p>Active alerts and important notifications will appear here.</p>
+            {# Placeholder for alerts list or summary cards #}
+        </div>
+    </div>
+{% endblock %}
