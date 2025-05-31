@@ -140,10 +140,10 @@ def dashboard_page():
     # The BLAZE_ വർഷം placeholder in base.html will be replaced by current_year from context_processor
     return render_template('dashboard.html', computers=computer_list, error_message=error_message)
 
-# --- API Routes ---
+# --- API Routes --- # This was the original comment, ensuring it's correct
 @app.route('/log_activity', methods=['POST'])
 def log_activity():
-    data = request.get_json()
+    data = request.get_json(silent=True) # Added silent=True
 
     if not data:
         return jsonify(status="error", message="Invalid JSON payload"), 400
