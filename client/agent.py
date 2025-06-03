@@ -276,11 +276,11 @@ def main():
                     local_ping_status_log = {
                         "event_type": "ping_status",
                         "timestamp": now_for_ping.isoformat(),
-                        "server_address": server_address if server_address else "N/A",
-                        "status": "failure",
-                        "details": ""
+                        "server_address": server_address if server_address else "N/A"
+                        # "status" will be added based on outcome
                     }
 
+                    # current_log_path is defined later in the loop, so for this specific log:
                     current_log_path_for_ping = os.path.join(app_config.get('log_folder', '.'), now_for_ping.strftime('%y%m%d') + 'Log_Usage_Windows.log')
 
                     if server_address and requests_available:
@@ -288,20 +288,21 @@ def main():
                             ping_payload_json = json.dumps(ping_payload)
 
                             if send_data_to_server(server_address, ping_payload_json):
-                                local_ping_status_log["status"] = "success"
-                                local_ping_status_log["details"] = messages.MSG_PING_SEND_SUCCESS_DETAILS.format(server_address)
+                                local_ping_status_log["status"] = "ok"
                             else:
-                                local_ping_status_log["details"] = f"Ping attempt to {server_address} failed. Check agent console output for specific errors from send_data_to_server."
+                                local_ping_status_log["status"] = "false"
+                                # Detailed error is already printed to console by send_data_to_server
 
                         except Exception as e:
-                            error_detail = messages.MSG_PING_SEND_EXCEPTION_DETAILS.format(server_address if server_address else "N/A", str(e))
-                            local_ping_status_log["details"] = error_detail
-                            print(f"CRITICAL: {error_detail}")
+                            local_ping_status_log["status"] = "false"
+                            # Print a concise error to console for this specific failure context
+                            print(f"Error during ping payload preparation or JSON dump: {str(e)}")
                     else:
+                        local_ping_status_log["status"] = "false"
                         if not server_address:
-                            local_ping_status_log["details"] = messages.MSG_PING_SKIPPED_NO_SERVER_DETAILS
+                            print(messages.MSG_PING_SKIPPED_NO_SERVER_DETAILS) # Keep console informed
                         elif not requests_available:
-                            local_ping_status_log["details"] = messages.MSG_PING_SKIPPED_NO_REQUESTS_DETAILS
+                            print(messages.MSG_PING_SKIPPED_NO_REQUESTS_DETAILS) # Keep console informed
 
                     try:
                         log_data_to_file(current_log_path_for_ping, json.dumps(local_ping_status_log))
