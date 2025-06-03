@@ -72,4 +72,3 @@ SELECT_LATEST_ACTIVITY_FOR_COMPUTER = """
 # Note: The dashboard alert section will likely involve more specific queries
 # or processing of data fetched by more general queries.
 # For now, these are just conceptual placeholders.
-```
