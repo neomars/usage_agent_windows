@@ -122,7 +122,8 @@ def load_app_config():
         'server_address': None,
         'cpu_alert_threshold': 90,
         'gpu_alert_threshold': 90,
-        'log_folder': '.'
+        'log_folder': '.',
+        'disk_space_alert_threshold_gb': 20
     }
 
     if not os.path.exists(config_file):
@@ -137,12 +138,14 @@ def load_app_config():
         cpu_threshold = parser.getint('agent_settings', 'cpu_alert_threshold', fallback=defaults['cpu_alert_threshold'])
         gpu_threshold = parser.getint('agent_settings', 'gpu_alert_threshold', fallback=defaults['gpu_alert_threshold'])
         log_folder = parser.get('agent_settings', 'log_folder', fallback=defaults['log_folder'])
+        disk_threshold = parser.getint('agent_settings', 'disk_space_alert_threshold_gb', fallback=defaults['disk_space_alert_threshold_gb'])
 
         return {
             'server_address': server_address,
             'cpu_alert_threshold': cpu_threshold,
             'gpu_alert_threshold': gpu_threshold,
-            'log_folder': log_folder
+            'log_folder': log_folder,
+            'disk_space_alert_threshold_gb': disk_threshold
         }
 
     except Exception as e:
@@ -209,6 +212,7 @@ def main():
     print(messages.MSG_CONFIG_CPU_THRESHOLD.format(app_config.get('cpu_alert_threshold', 90)))
     print(messages.MSG_CONFIG_GPU_THRESHOLD.format(app_config.get('gpu_alert_threshold', 90)))
     print(messages.MSG_CONFIG_LOG_FOLDER.format(app_config.get('log_folder', '.')))
+    print(messages.MSG_CONFIG_DISK_THRESHOLD.format(app_config.get('disk_space_alert_threshold_gb', 20))) # Using .get for safety, though load_app_config ensures it.
     print(messages.MSG_CONFIG_FOOTER)
 
     server_address = app_config.get('server_address')
@@ -249,8 +253,19 @@ def main():
 
             netbios_name = get_netbios_name()
             ip_address = get_ip_address()
-            free_space_gb_val = get_free_disk_space('C:\\')
-            free_space_gb = round(free_space_gb_val, 2) if free_space_gb_val is not None else None
+            free_space_gb_val = get_free_disk_space('C:\\') # This returns the raw GB value or None
+
+            # Round the value if it's not None, for consistent representation
+            current_free_space_gb_rounded = None
+            if free_space_gb_val is not None:
+                current_free_space_gb_rounded = round(free_space_gb_val, 2)
+
+            # Determine if it should be included in the payload based on threshold
+            payload_free_disk_space_gb = None
+            if current_free_space_gb_rounded is not None:
+                # disk_space_alert_threshold_gb is already part of app_config
+                if current_free_space_gb_rounded < app_config['disk_space_alert_threshold_gb']:
+                    payload_free_disk_space_gb = current_free_space_gb_rounded
 
             cpu_val = get_cpu_usage()
             gpu_val = get_gpu_usage()
@@ -274,7 +289,7 @@ def main():
                 "timestamp": current_time.isoformat(),
                 "netbios_name": netbios_name,
                 "ip_address": ip_address,
-                "free_disk_space_gb": free_space_gb,
+                "free_disk_space_gb": payload_free_disk_space_gb, # Use the thresholded and rounded value
                 "cpu_usage_percent": final_cpu_usage,
                 "gpu_usage_percent": final_gpu_usage
             }
