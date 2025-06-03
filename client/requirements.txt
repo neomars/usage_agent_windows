@@ -1,0 +1,4 @@
+psutil
+GPUtil
+pygetwindow
+requests
