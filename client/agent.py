@@ -6,7 +6,7 @@ import socket
 import shutil
 import json
 # subprocess removed
-from datetime import datetime, timedelta # Ensure timedelta is also imported
+from datetime import datetime, timedelta, date # Ensure date is also imported
 import messages_agent as messages # Updated import
 
 # --- Attempt to import optional modules ---
@@ -110,6 +110,49 @@ def get_active_window_title():
         return ""
 # --- End of Data Collection Functions ---
 
+# --- Log Cleanup Function ---
+def cleanup_old_logs(log_folder_path, retention_days):
+    print(messages.MSG_LOG_CLEANUP_STARTED)
+
+    if retention_days < 0:
+        print(messages.MSG_LOG_RETENTION_NEGATIVE.format(retention_days))
+        return
+
+    try:
+        if not os.path.isdir(log_folder_path):
+            print(f"Log folder not found: {log_folder_path}") # Or use a message
+            return
+
+        log_files_found = False
+        today = date.today()
+
+        for filename in os.listdir(log_folder_path):
+            if filename.endswith("Log_Usage_Windows.log") and len(filename) == (6 + len("Log_Usage_Windows.log")):
+                log_files_found = True
+                date_str = filename[:6]
+                try:
+                    log_file_date = datetime.strptime(date_str, "%y%m%d").date()
+                    age_in_days = (today - log_file_date).days
+
+                    if age_in_days > retention_days:
+                        file_path_to_delete = os.path.join(log_folder_path, filename)
+                        try:
+                            os.remove(file_path_to_delete)
+                            print(messages.MSG_DELETING_OLD_LOG.format(file_path_to_delete, age_in_days))
+                        except OSError as e:
+                            print(messages.MSG_ERROR_DELETING_LOG.format(file_path_to_delete, e))
+
+                except ValueError:
+                    print(messages.MSG_ERROR_PARSING_LOG_FILENAME.format(filename))
+
+        if not log_files_found:
+            print(messages.MSG_NO_LOG_FILES_FOUND.format(log_folder_path))
+
+    except Exception as e:
+        print(f"An unexpected error occurred during log cleanup: {e}")
+
+    print(messages.MSG_LOG_CLEANUP_COMPLETED)
+
 # --- Configuration and Logging Functions ---
 def load_app_config():
     """
@@ -126,7 +169,8 @@ def load_app_config():
         'gpu_alert_threshold': 90,
         'log_folder': '.',
         'disk_space_alert_threshold_gb': 20,
-        'ping_interval_seconds': 60
+        'ping_interval_seconds': 60,
+        'log_retention_days': 14
     }
 
     if not os.path.exists(config_file):
@@ -143,6 +187,7 @@ def load_app_config():
         log_folder = parser.get('agent_settings', 'log_folder', fallback=defaults['log_folder'])
         disk_threshold = parser.getint('agent_settings', 'disk_space_alert_threshold_gb', fallback=defaults['disk_space_alert_threshold_gb'])
         ping_interval = parser.getint('agent_settings', 'ping_interval_seconds', fallback=defaults['ping_interval_seconds'])
+        log_retention = parser.getint('agent_settings', 'log_retention_days', fallback=defaults['log_retention_days'])
 
         return {
             'server_address': server_address,
@@ -150,7 +195,8 @@ def load_app_config():
             'gpu_alert_threshold': gpu_threshold,
             'log_folder': log_folder,
             'disk_space_alert_threshold_gb': disk_threshold,
-            'ping_interval_seconds': ping_interval
+            'ping_interval_seconds': ping_interval,
+            'log_retention_days': log_retention
         }
 
     except Exception as e:
@@ -209,9 +255,12 @@ def send_data_to_server(server_address, json_payload):
 # --- Main Application ---
 def main():
     """Main function for the agent."""
-    print(messages.MSG_AGENT_STARTING)
+    # Initial "Agent starting up" message
+    print(messages.MSG_AGENT_STARTING) # Moved earlier
+
     app_config = load_app_config()
 
+    # Print loaded configuration
     print(messages.MSG_CONFIG_LOADED_HEADER)
     print(messages.MSG_CONFIG_SERVER_ADDRESS.format(app_config.get('server_address', 'Not configured')))
     print(messages.MSG_CONFIG_CPU_THRESHOLD.format(app_config.get('cpu_alert_threshold', 90)))
@@ -219,7 +268,13 @@ def main():
     print(messages.MSG_CONFIG_LOG_FOLDER.format(app_config.get('log_folder', '.')))
     print(messages.MSG_CONFIG_DISK_THRESHOLD.format(app_config.get('disk_space_alert_threshold_gb', 20))) # Using .get for safety, though load_app_config ensures it.
     print(messages.MSG_CONFIG_PING_INTERVAL.format(app_config.get('ping_interval_seconds', 60))) # Using .get for safety
+    print(messages.MSG_CONFIG_LOG_RETENTION.format(app_config.get('log_retention_days', 14))) # Using .get for safety
     print(messages.MSG_CONFIG_FOOTER)
+
+    # Perform log cleanup at startup
+    log_folder_for_cleanup = app_config.get('log_folder', '.')
+    retention_days_for_cleanup = app_config.get('log_retention_days', 14)
+    cleanup_old_logs(log_folder_for_cleanup, retention_days_for_cleanup)
 
     server_address = app_config.get('server_address')
 
