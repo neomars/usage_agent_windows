@@ -7,6 +7,7 @@ MSG_CONFIG_CPU_THRESHOLD = "CPU Alert Threshold: {}%"
 MSG_CONFIG_GPU_THRESHOLD = "GPU Alert Threshold: {}%"
 MSG_CONFIG_LOG_FOLDER = "Log Folder: {}"
 MSG_CONFIG_DISK_THRESHOLD = "Disk Space Alert Threshold (GB): {}"
+MSG_CONFIG_PING_INTERVAL = "Server Ping Interval (Seconds): {}"
 MSG_CONFIG_FOOTER = "---------------------------"
 MSG_CONFIG_FILE_NOT_FOUND = "Warning: Configuration file 'config.ini' not found. Using default settings."
 MSG_CONFIG_ERROR_READING = "Error reading 'config.ini': {}. Using default settings."
@@ -50,6 +51,14 @@ MSG_SEND_SKIPPING_JSON_ERROR = "Skipping transmission of {} due to JSON serializ
 
 # --- General Error Messages ---
 MSG_UNEXPECTED_ERROR_MAIN_LOOP = "An unexpected error occurred in the main loop: {}"
+
+# --- Ping Messages ---
+MSG_ATTEMPTING_SERVER_PING = "Attempting server ping..."
+MSG_PING_SEND_SUCCESS_DETAILS = "Ping to server {} successful."
+MSG_PING_SEND_EXCEPTION_DETAILS = "Error preparing ping payload for server {}: {}"
+MSG_PING_SKIPPED_NO_SERVER_DETAILS = "Ping skipped: Server address not configured."
+MSG_PING_SKIPPED_NO_REQUESTS_DETAILS = "Ping skipped: 'requests' module not available."
+MSG_ERROR_WRITING_PING_STATUS_LOG = "Error writing ping status to local log: {}"
 
 # --- Agent Startup Messages ---
 MSG_AGENT_STARTING = "Agent starting up..."
