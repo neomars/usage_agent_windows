@@ -36,7 +36,7 @@ MSG_LOGGING_TO_FILE = "Logging data to: {}"
 MSG_LOG_FILE_DAILY_CHANGE = "New day, logging to: {}"
 MSG_LOG_FILE_WRITING_ERROR = "Error writing to log file '{}': {}"
 MSG_LOG_PATH_ERROR = "Error ensuring log path '{}' exists or writing to file: {}"
-MSG_JSON_SERIALIZATION_ERROR = "Error serializing data to JSON for logging: {}. Payload was: {}"
+MSG_JSON_SERIALIZATION_ERROR = "Error serializing {} to JSON for logging: {}. Payload was: {}"
 
 # --- Data Transmission Messages ---
 MSG_SENDING_DATA_TO_SERVER = "Data successfully sent to {} (Status: {})"
@@ -45,7 +45,7 @@ MSG_SEND_CONNECTION_ERROR = "Connection error sending data to {}: {}"
 MSG_SEND_TIMEOUT_ERROR = "Timeout sending data to {}: {}"
 MSG_SEND_REQUEST_EXCEPTION = "Error sending data to {}: {}"
 MSG_SEND_UNEXPECTED_ERROR = "Unexpected error in send_data_to_server: {}"
-MSG_SEND_SKIPPING_JSON_ERROR = "Skipping data transmission due to JSON serialization error for logging."
+MSG_SEND_SKIPPING_JSON_ERROR = "Skipping transmission of {} due to JSON serialization error during logging."
 
 # --- General Error Messages ---
 MSG_UNEXPECTED_ERROR_MAIN_LOOP = "An unexpected error occurred in the main loop: {}"

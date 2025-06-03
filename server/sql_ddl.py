@@ -33,10 +33,21 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     timestamp DATETIME NOT NULL,
     free_disk_space_gb FLOAT,
     cpu_usage_percent FLOAT,
-    gpu_usage_percent FLOAT,
-    active_window_title VARCHAR(512),
+        gpu_usage_percent FLOAT,  # Comma removed from here
     INDEX idx_activity_computer_id_timestamp (computer_id, timestamp), /* Composite index */
     INDEX idx_activity_timestamp (timestamp), /* Separate index on timestamp can also be useful */
+    FOREIGN KEY (computer_id) REFERENCES computers(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+"""
+
+CREATE_APPLICATION_USAGE_LOGS_TABLE = """
+CREATE TABLE IF NOT EXISTS application_usage_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    computer_id INT NOT NULL,
+    timestamp DATETIME NOT NULL,
+    active_window_title VARCHAR(512),
+    INDEX idx_app_usage_computer_id_timestamp (computer_id, timestamp),
+    INDEX idx_app_usage_timestamp (timestamp),
     FOREIGN KEY (computer_id) REFERENCES computers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 """
@@ -45,5 +56,6 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 ALL_TABLES_DDL = [
     CREATE_COMPUTER_GROUPS_TABLE,
     CREATE_COMPUTERS_TABLE,
-    CREATE_ACTIVITY_LOGS_TABLE
+    CREATE_ACTIVITY_LOGS_TABLE,
+    CREATE_APPLICATION_USAGE_LOGS_TABLE
 ]
