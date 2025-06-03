@@ -54,8 +54,6 @@ MSG_UNEXPECTED_ERROR_MAIN_LOOP = "An unexpected error occurred in the main loop:
 
 # --- Ping Messages ---
 MSG_ATTEMPTING_SERVER_PING = "Attempting server ping..."
-MSG_PING_SEND_SUCCESS_DETAILS = "Ping to server {} successful."
-MSG_PING_SEND_EXCEPTION_DETAILS = "Error preparing ping payload for server {}: {}"
 MSG_PING_SKIPPED_NO_SERVER_DETAILS = "Ping skipped: Server address not configured."
 MSG_PING_SKIPPED_NO_REQUESTS_DETAILS = "Ping skipped: 'requests' module not available."
 MSG_ERROR_WRITING_PING_STATUS_LOG = "Error writing ping status to local log: {}"
