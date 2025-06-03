@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template
 import sys
 from datetime import datetime, timedelta
 from . import sql_ddl  # Relative import
+# Ensure this is present, it was in the original code so should be fine.
 from . import sql_dml  # Relative import
 from . import messages_server as messages # Relative import for server messages
 import configparser
@@ -191,46 +192,139 @@ def dashboard_page():
 
 # --- API Routes ---
 # (Error logging in API routes will use generic messages for now, or can be enhanced with app.logger)
+# Make sure 'from datetime import datetime' is at the top of server.py
+# from . import sql_dml # Should already exist
+# from . import messages_server as messages # Should already exist
+# import mariadb # Should already exist
+
 @app.route('/log_activity', methods=['POST'])
 def log_activity():
     data = request.get_json(silent=True)
-    if not data: return jsonify(status="error", message="Invalid JSON payload"), 400
-    required_keys = ['netbios_name', 'ip_address', 'timestamp']
-    for key in required_keys:
-        if key not in data: return jsonify(status="error", message=f"Missing required key: {key}"), 400
-    conn = None; cursor = None
+    if not data:
+        return jsonify(status="error", message="Invalid JSON payload"), 400
+
+    log_type = data.get('log_type')
+    if not log_type:
+        return jsonify(status="error", message="Missing 'log_type' field in payload"), 400
+
+    raw_timestamp = data.get('timestamp')
+    if not raw_timestamp:
+        return jsonify(status="error", message=f"Missing common required key: timestamp for log_type '{log_type}'"), 400
+
+    parsed_timestamp = None
+    try:
+        # Agent sends ISO format (e.g., "2023-10-27T10:30:00.123456").
+        # Replace 'Z' if present (UTC timezone designator) for compatibility with fromisoformat.
+        if isinstance(raw_timestamp, str):
+            parsed_timestamp = datetime.fromisoformat(raw_timestamp.replace('Z', '+00:00'))
+        else: # Should be a string, but good to be safe
+            raise ValueError("Timestamp must be a string.")
+    except ValueError as e:
+        return jsonify(status="error", message=f"Invalid timestamp format: {raw_timestamp}. Expected ISO format. Error: {e}"), 400
+
+    if 'netbios_name' not in data or not str(data['netbios_name']).strip():
+        return jsonify(status="error", message=f"Missing or empty common required key: netbios_name for log_type '{log_type}'"), 400
+
+    netbios_name = str(data['netbios_name']).strip()
+
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
-        if not conn: return jsonify(status="error", message="Database connection failed"), 500
+        if not conn:
+            return jsonify(status="error", message="Database connection failed"), 500
         cursor = conn.cursor()
-        cursor.execute(sql_dml.SELECT_COMPUTER_BY_NETBIOS, (data['netbios_name'],))
+
+        computer_id = None
+        cursor.execute(sql_dml.SELECT_COMPUTER_BY_NETBIOS, (netbios_name,))
         result = cursor.fetchone()
-        if result:
-            computer_id = result[0]
-            cursor.execute(sql_dml.UPDATE_COMPUTER_LAST_SEEN_IP, (data['ip_address'], computer_id))
+
+        if log_type == "machine":
+            ip_address = data.get('ip_address')
+            if not ip_address or not str(ip_address).strip():
+                return jsonify(status="error", message="Missing or empty required key 'ip_address' for log_type 'machine'"), 400
+            ip_address = str(ip_address).strip()
+
+            if result: # Computer exists
+                computer_id = result[0]
+                cursor.execute(sql_dml.UPDATE_COMPUTER_LAST_SEEN_IP, (ip_address, parsed_timestamp, computer_id))
+            else: # New computer
+                cursor.execute(sql_dml.INSERT_NEW_COMPUTER, (netbios_name, ip_address, parsed_timestamp))
+                computer_id = cursor.lastrowid
+
+            if not computer_id:
+                if conn: conn.rollback()
+                return jsonify(status="error", message="Failed to obtain or create computer ID for 'machine' log"), 500
+
+            # Actual machine data insertion (e.g., into activity_logs) will be handled in a subsequent plan step.
+            # For now, this step focuses on updating/creating the computer entry and validating log structure.
+            # print(f"Machine log for computer_id {computer_id} acknowledged. Computer record updated/created.") # Old print
+            cursor.execute(sql_dml.INSERT_ACTIVITY_LOG, (
+                computer_id,
+                parsed_timestamp, # This is the datetime object from earlier validation
+                data.get('free_disk_space_gb'), # Already rounded by agent or None
+                data.get('cpu_usage_percent'),  # Already rounded by agent or None
+                data.get('gpu_usage_percent')   # Already rounded by agent or None
+                # active_window_title is NOT included here as it will be removed from this table
+            ))
+            print(f"Machine log for computer_id {computer_id} inserted into activity_logs.")
+
+        elif log_type == "application":
+            # active_window_title can be an empty string, so data.get() is fine.
+            # No specific validation needed for active_window_title beyond its presence (handled by later DML step).
+            # active_window_title = data.get('active_window_title') # This will be used in the INSERT step.
+
+            if result: # Computer exists
+                computer_id = result[0]
+            else: # Computer not found for an application log
+                if conn: conn.rollback()
+                return jsonify(status="error", message=f"Computer '{netbios_name}' not found. Application logs require an existing machine record (created by a 'machine' log)."), 404
+
+            if not computer_id: # Should not be reached if logic above is correct
+                if conn: conn.rollback()
+                return jsonify(status="error", message="Failed to obtain computer ID for 'application' log"), 500
+
+            # Actual application data insertion (e.g., into application_usage_logs) will be handled in a subsequent plan step.
+            # print(f"Application log for computer_id {computer_id} acknowledged.") # Old print
+            active_window_title = data.get('active_window_title', "") # Ensure active_window_title is fetched
+
+            # Use parsed_timestamp that was validated earlier in the function
+            cursor.execute(sql_dml.INSERT_APPLICATION_LOG, (
+                computer_id,
+                parsed_timestamp, # This is the datetime object from earlier validation
+                active_window_title
+            ))
+            print(f"Application log for computer_id {computer_id} (Active Window: '{active_window_title}') inserted into application_usage_logs.")
+
         else:
-            cursor.execute(sql_dml.INSERT_NEW_COMPUTER, (data['netbios_name'], data['ip_address']))
-            computer_id = cursor.lastrowid
-        if not computer_id: conn.rollback(); return jsonify(status="error", message="Failed to obtain computer ID"), 500
-        cursor.execute(sql_dml.INSERT_ACTIVITY_LOG, (
-            computer_id, data.get('timestamp'), data.get('free_disk_space_gb'),
-            data.get('cpu_usage_percent'), data.get('gpu_usage_percent'), data.get('active_window_title')
-        ))
+            if conn: conn.rollback()
+            return jsonify(status="error", message=f"Unknown log_type: {log_type}"), 400
+
         conn.commit()
-        return jsonify(status="success", message="Data logged successfully"), 200
+        return jsonify(status="success", message=f"Log type '{log_type}' acknowledged for '{netbios_name}'. Computer record updated/verified. Specific data insertion follows in next steps."), 200
+
     except mariadb.Error as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
-        print(messages.API_DB_ERROR_GENERAL.format('/log_activity', e))
+        if conn:
+            try: conn.rollback()
+            except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
+        print(messages.API_DB_ERROR_GENERAL.format('/log_activity', e)) # Using existing key
         return jsonify(status="error", message=f"Database error: {str(e)}"), 500
+    except ValueError as e: # Catch specific ValueErrors from timestamp parsing or other conversions
+        if conn: conn.rollback()
+        return jsonify(status="error", message=f"Data validation error: {str(e)}"), 400
     except Exception as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try: conn.rollback()
+            except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
+        import traceback
+        print(f"Unexpected error in /log_activity: {e}\n{traceback.format_exc()}")
         print(messages.API_UNEXPECTED_ERROR_GENERAL.format('/log_activity', e))
-        return jsonify(status="error", message=f"An unexpected server error occurred: {str(e)}"), 500
+        return jsonify(status="error", message=f"An unexpected server error occurred."), 500 # Avoid sending detailed arbitrary error 'e'
     finally:
-        if cursor: cursor.close()
-        if conn: conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @app.route('/api/groups/create', methods=['POST'])
 def create_group():

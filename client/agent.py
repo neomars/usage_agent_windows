@@ -256,38 +256,52 @@ def main():
             gpu_val = get_gpu_usage()
             active_title = get_active_window_title()
 
-            data_payload = {
+            machine_payload = {
+                "log_type": "machine",
                 "timestamp": current_time.isoformat(),
                 "netbios_name": netbios_name,
                 "ip_address": ip_address,
-                "free_disk_space_gb": free_space_gb,
-                "cpu_usage_percent": None,
-                "gpu_usage_percent": None,
+                "free_disk_space_gb": free_space_gb, # free_space_gb is already rounded or None
+                "cpu_usage_percent": round(cpu_val, 1) if cpu_val is not None else None,
+                "gpu_usage_percent": round(gpu_val, 1) if gpu_val is not None else None
+            }
+
+            application_payload = {
+                "log_type": "application",
+                "timestamp": current_time.isoformat(),
+                "netbios_name": netbios_name,
                 "active_window_title": active_title
             }
 
-            if cpu_val is not None:
-                cpu_rounded = round(cpu_val, 1)
-                if cpu_val > app_config.get('cpu_alert_threshold', 90):
-                    data_payload["cpu_usage_percent"] = cpu_rounded
-
-            if gpu_val is not None:
-                gpu_rounded = round(gpu_val, 1)
-                if gpu_val > app_config.get('gpu_alert_threshold', 90):
-                    data_payload["gpu_usage_percent"] = gpu_rounded
-
-            json_data_for_log = None
+            # Process and log machine_payload
+            json_machine_data_for_log = None
             try:
-                json_data_for_log = json.dumps(data_payload)
-                log_data_to_file(current_log_path, json_data_for_log)
+                json_machine_data_for_log = json.dumps(machine_payload)
+                log_data_to_file(current_log_path, json_machine_data_for_log)
             except TypeError as e:
-                print(messages.MSG_JSON_SERIALIZATION_ERROR.format(e, data_payload))
-                json_data_for_log = None
+                print(messages.MSG_JSON_SERIALIZATION_ERROR.format("machine data", e, machine_payload))
+                json_machine_data_for_log = None # Ensure it's None if serialization fails
 
-            if server_address and requests_available and json_data_for_log:
-                send_data_to_server(server_address, json_data_for_log)
-            elif server_address and requests_available and not json_data_for_log:
-                print(messages.MSG_SEND_SKIPPING_JSON_ERROR)
+            if server_address and requests_available:
+                if json_machine_data_for_log:
+                    send_data_to_server(server_address, json_machine_data_for_log)
+                else:
+                    print(messages.MSG_SEND_SKIPPING_JSON_ERROR.format("machine data"))
+
+            # Process and log application_payload
+            json_app_data_for_log = None
+            try:
+                json_app_data_for_log = json.dumps(application_payload)
+                log_data_to_file(current_log_path, json_app_data_for_log)
+            except TypeError as e:
+                print(messages.MSG_JSON_SERIALIZATION_ERROR.format("application data", e, application_payload))
+                json_app_data_for_log = None # Ensure it's None
+
+            if server_address and requests_available:
+                if json_app_data_for_log:
+                    send_data_to_server(server_address, json_app_data_for_log)
+                else:
+                    print(messages.MSG_SEND_SKIPPING_JSON_ERROR.format("application data"))
 
             time.sleep(30)
         except Exception as e:
