@@ -5,7 +5,7 @@ import os
 import socket
 import shutil
 import json
-import subprocess
+# subprocess removed
 from datetime import datetime, timedelta # Ensure timedelta is also imported
 import messages_agent as messages # Updated import
 
@@ -125,8 +125,7 @@ def load_app_config():
         'cpu_alert_threshold': 90,
         'gpu_alert_threshold': 90,
         'log_folder': '.',
-        'disk_space_alert_threshold_gb': 20,
-        'windows_update_check_interval_hours': 24
+        'disk_space_alert_threshold_gb': 20
     }
 
     if not os.path.exists(config_file):
@@ -142,15 +141,13 @@ def load_app_config():
         gpu_threshold = parser.getint('agent_settings', 'gpu_alert_threshold', fallback=defaults['gpu_alert_threshold'])
         log_folder = parser.get('agent_settings', 'log_folder', fallback=defaults['log_folder'])
         disk_threshold = parser.getint('agent_settings', 'disk_space_alert_threshold_gb', fallback=defaults['disk_space_alert_threshold_gb'])
-        windows_update_interval = parser.getint('agent_settings', 'windows_update_check_interval_hours', fallback=defaults['windows_update_check_interval_hours'])
 
         return {
             'server_address': server_address,
             'cpu_alert_threshold': cpu_threshold,
             'gpu_alert_threshold': gpu_threshold,
             'log_folder': log_folder,
-            'disk_space_alert_threshold_gb': disk_threshold,
-            'windows_update_check_interval_hours': windows_update_interval
+            'disk_space_alert_threshold_gb': disk_threshold
         }
 
     except Exception as e:
@@ -218,7 +215,6 @@ def main():
     print(messages.MSG_CONFIG_GPU_THRESHOLD.format(app_config.get('gpu_alert_threshold', 90)))
     print(messages.MSG_CONFIG_LOG_FOLDER.format(app_config.get('log_folder', '.')))
     print(messages.MSG_CONFIG_DISK_THRESHOLD.format(app_config.get('disk_space_alert_threshold_gb', 20))) # Using .get for safety, though load_app_config ensures it.
-    print(messages.MSG_CONFIG_WINDOWS_UPDATE_INTERVAL.format(app_config.get('windows_update_check_interval_hours', 24))) # Using .get for safety
     print(messages.MSG_CONFIG_FOOTER)
 
     server_address = app_config.get('server_address')
@@ -244,77 +240,11 @@ def main():
     print(messages.MSG_LOGGING_TO_FILE.format(initial_log_path))
 
     last_logged_day_str = ""
-    last_windows_update_check_time = None # Initialize here
+    # last_windows_update_check_time = None # Line removed
 
     while True:
         try:
-            # Windows Update Check Logic
-            try:
-                interval_hours = app_config.get('windows_update_check_interval_hours', 24)
-                should_check_updates = False
-                now_for_update_check = datetime.now() # Use a consistent 'now' for this block
-
-                if last_windows_update_check_time is None:
-                    should_check_updates = True # Check on first run
-                else:
-                    if (now_for_update_check - last_windows_update_check_time).total_seconds() >= interval_hours * 3600:
-                        should_check_updates = True
-
-                if should_check_updates:
-                    print(messages.MSG_WINDOWS_UPDATE_CHECK_STARTING)
-                    # Correct path assuming agent.py is in client/ and script is also in client/
-                    powershell_script_path = os.path.join(os.path.dirname(__file__), 'get_windows_update_status.ps1')
-
-                    process = subprocess.run(
-                        ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", powershell_script_path],
-                        capture_output=True, text=True, check=False, timeout=300 # 5 min timeout
-                    )
-
-                    current_log_path_for_wu = os.path.join(app_config.get('log_folder', '.'), datetime.now().strftime('%y%m%d') + 'Log_Usage_Windows.log')
-
-
-                    if process.returncode == 0:
-                        try:
-                            update_status_data = json.loads(process.stdout)
-
-                            windows_update_payload = {
-                                "log_type": "windows_update",
-                                "timestamp": now_for_update_check.isoformat(),
-                                "netbios_name": get_netbios_name(),
-                                "wsus_server": update_status_data.get("wsusServer"),
-                                "last_scan_time": update_status_data.get("lastScanTime"),
-                                "pending_security_updates_count": update_status_data.get("pendingSecurityUpdatesCount"),
-                                "reboot_pending": update_status_data.get("rebootPending"),
-                                "overall_status": update_status_data.get("overallStatus"),
-                                "script_error_message": update_status_data.get("errorMessage")
-                            }
-
-                            json_wu_payload = json.dumps(windows_update_payload)
-                            # Need current_log_path here. It's defined later in the loop.
-                            # This means we either pass current_log_path into this section,
-                            # or define it earlier. Let's assume current_log_path needs to be
-                            # determined based on current_time for the daily log rotation.
-                            # For simplicity here, I'll use the 'current_log_path_for_wu'
-                            # which uses the 'now_for_update_check' time.
-                            log_data_to_file(current_log_path_for_wu, json_wu_payload)
-
-                            server_address_local = app_config.get('server_address') # re-fetch in case it changes? No, app_config is fixed per agent run.
-                            if server_address_local and requests_available:
-                                send_data_to_server(server_address_local, json_wu_payload)
-
-                            print(messages.MSG_WINDOWS_UPDATE_CHECK_COMPLETED.format(windows_update_payload.get("overall_status")))
-
-                        except json.JSONDecodeError as e:
-                            print(messages.MSG_WINDOWS_UPDATE_JSON_ERROR.format(e, process.stdout))
-                        except Exception as e:
-                            print(messages.MSG_WINDOWS_UPDATE_PROCESSING_ERROR.format(e))
-                    else:
-                        print(messages.MSG_WINDOWS_UPDATE_SCRIPT_ERROR.format(process.returncode, process.stderr))
-
-                    last_windows_update_check_time = now_for_update_check
-
-            except Exception as e:
-                print(messages.MSG_WINDOWS_UPDATE_SCHEDULING_ERROR.format(e))
+            # Windows Update Check Logic REMOVED
 
             # Regular data collection starts here
             current_time = datetime.now() # This current_time is for the main machine/app payloads
