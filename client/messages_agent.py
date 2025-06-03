@@ -7,6 +7,7 @@ MSG_CONFIG_CPU_THRESHOLD = "CPU Alert Threshold: {}%"
 MSG_CONFIG_GPU_THRESHOLD = "GPU Alert Threshold: {}%"
 MSG_CONFIG_LOG_FOLDER = "Log Folder: {}"
 MSG_CONFIG_DISK_THRESHOLD = "Disk Space Alert Threshold (GB): {}"
+MSG_CONFIG_WINDOWS_UPDATE_INTERVAL = "Windows Update Check Interval (Hours): {}"
 MSG_CONFIG_FOOTER = "---------------------------"
 MSG_CONFIG_FILE_NOT_FOUND = "Warning: Configuration file 'config.ini' not found. Using default settings."
 MSG_CONFIG_ERROR_READING = "Error reading 'config.ini': {}. Using default settings."
@@ -50,6 +51,14 @@ MSG_SEND_SKIPPING_JSON_ERROR = "Skipping transmission of {} due to JSON serializ
 
 # --- General Error Messages ---
 MSG_UNEXPECTED_ERROR_MAIN_LOOP = "An unexpected error occurred in the main loop: {}"
+
+# --- Windows Update Check Messages ---
+MSG_WINDOWS_UPDATE_CHECK_STARTING = "Starting Windows Update status check..."
+MSG_WINDOWS_UPDATE_CHECK_COMPLETED = "Windows Update status check completed. Overall status: {}"
+MSG_WINDOWS_UPDATE_JSON_ERROR = "Error decoding JSON from Windows Update script: {}. Output: {}"
+MSG_WINDOWS_UPDATE_PROCESSING_ERROR = "Error processing Windows Update data: {}"
+MSG_WINDOWS_UPDATE_SCRIPT_ERROR = "Windows Update script failed with code {}. Error: {}"
+MSG_WINDOWS_UPDATE_SCHEDULING_ERROR = "Error in Windows Update check scheduling: {}"
 
 # --- Agent Startup Messages ---
 MSG_AGENT_STARTING = "Agent starting up..."

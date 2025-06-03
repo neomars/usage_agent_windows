@@ -298,6 +298,59 @@ def log_activity():
             ))
             print(f"Application log for computer_id {computer_id} (Active Window: '{active_window_title}') inserted into application_usage_logs.")
 
+    elif log_type == "windows_update":
+        # Required fields for this log type (netbios_name and timestamp are already validated)
+        # Other fields from the PS script are optional in terms of presence in payload,
+        # as the script might fail to get them or they might be null.
+        # The DDL allows nulls for most of these.
+
+        # We already have netbios_name and parsed_timestamp from earlier in the function.
+
+        if not result: # Computer not found (result is from SELECT_COMPUTER_BY_NETBIOS)
+            if conn: conn.rollback()
+            return jsonify(status="error", message=f"Computer '{netbios_name}' not found. Windows Update logs require an existing machine record."), 404
+
+        computer_id = result[0]
+        if not computer_id: # Should not happen if result is not None
+            if conn: conn.rollback()
+            return jsonify(status="error", message="Failed to obtain computer ID for 'windows_update' log"), 500
+
+        # Extract data from payload - use .get() for safety as some fields might be null/missing if PS script had issues
+        wsus_server = data.get('wsus_server')
+        last_scan_time_str = data.get('last_scan_time') # This will be an ISO string or null
+        pending_updates_count = data.get('pending_security_updates_count')
+        reboot_pending = data.get('reboot_pending') # Should be boolean
+        overall_status = data.get('overall_status')
+        script_error_msg = data.get('script_error_message')
+
+        # Convert last_scan_time from ISO string to datetime object if present
+        parsed_last_scan_time = None
+        if last_scan_time_str:
+            try:
+                parsed_last_scan_time = datetime.fromisoformat(last_scan_time_str.replace('Z', '+00:00'))
+            except ValueError:
+                print(f"Warning: Invalid last_scan_time format '{last_scan_time_str}' for computer_id {computer_id}. Storing as NULL.")
+                # parsed_last_scan_time remains None
+
+        if reboot_pending is not None and not isinstance(reboot_pending, bool):
+            if isinstance(reboot_pending, str):
+                reboot_pending = reboot_pending.lower() == 'true'
+            else:
+                print(f"Warning: reboot_pending field ('{reboot_pending}') is not a boolean. Storing as NULL/False or investigate payload.")
+                reboot_pending = None
+
+        cursor.execute(sql_dml.INSERT_WINDOWS_UPDATE_STATUS, (
+            computer_id,
+            parsed_timestamp,
+            wsus_server,
+            parsed_last_scan_time,
+            pending_updates_count,
+            reboot_pending,
+            overall_status,
+            script_error_msg
+        ))
+        print(f"Windows Update log for computer_id {computer_id} (Status: '{overall_status}') inserted into windows_update_status.")
+
         else:
             if conn: conn.rollback()
             return jsonify(status="error", message=f"Unknown log_type: {log_type}"), 400

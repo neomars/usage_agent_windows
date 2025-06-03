@@ -19,6 +19,13 @@ INSERT_APPLICATION_LOG = """
     VALUES (%s, %s, %s)
 """
 
+INSERT_WINDOWS_UPDATE_STATUS = """
+    INSERT INTO windows_update_status
+    (computer_id, payload_timestamp, wsus_server, last_scan_time,
+     pending_security_updates_count, reboot_pending, overall_status, script_error_message)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+"""
+
 # --- Queries for Group Management API (/api/groups/*) ---
 INSERT_NEW_GROUP = "INSERT INTO computer_groups (name, description) VALUES (%s, %s)"
 SELECT_ALL_GROUPS = "SELECT id, name, description FROM computer_groups ORDER BY name"
