@@ -60,4 +60,3 @@ def format_config_value_missing_info(key_name, section_name, default_value):
 
 def format_config_section_missing_info(section_name):
     return f"Info: Configuration section '[{section_name}]' not found. Using defaults for all its settings."
-```

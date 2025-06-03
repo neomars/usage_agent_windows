@@ -99,4 +99,3 @@ DASHBOARD_UNEXPECTED_FETCH_ERROR = "An unexpected error occurred fetching data f
 API_ROLLBACK_ERROR = "Error during rollback attempt: {}" # Generic for API routes
 API_DB_ERROR_GENERAL = "Database error during API request [{}]: {}" # Route info, error
 API_UNEXPECTED_ERROR_GENERAL = "Unexpected error during API request [{}]: {}" # Route info, error
-```
