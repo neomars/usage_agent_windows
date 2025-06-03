@@ -244,12 +244,14 @@ def log_activity():
             if not ip_address or not str(ip_address).strip():
                 return jsonify(status="error", message="Missing or empty required key 'ip_address' for log_type 'machine'"), 400
             ip_address = str(ip_address).strip()
+            os_name = data.get('os_name') # Defaults to None if not present
+            os_version = data.get('os_version') # Defaults to None if not present
 
             if result: # Computer exists
                 computer_id = result[0]
-                cursor.execute(sql_dml.UPDATE_COMPUTER_LAST_SEEN_IP, (ip_address, parsed_timestamp, computer_id))
+                cursor.execute(sql_dml.UPDATE_COMPUTER_LAST_SEEN_IP, (ip_address, parsed_timestamp, os_name, os_version, computer_id))
             else: # New computer
-                cursor.execute(sql_dml.INSERT_NEW_COMPUTER, (netbios_name, ip_address, parsed_timestamp))
+                cursor.execute(sql_dml.INSERT_NEW_COMPUTER, (netbios_name, ip_address, parsed_timestamp, os_name, os_version))
                 computer_id = cursor.lastrowid
 
             if not computer_id:

@@ -1,4 +1,5 @@
 import configparser
+import platform
 import time
 import os
 import socket
@@ -267,6 +268,14 @@ def main():
                 if current_free_space_gb_rounded < app_config['disk_space_alert_threshold_gb']:
                     payload_free_disk_space_gb = current_free_space_gb_rounded
 
+            try:
+                os_name = platform.system()
+                os_version = platform.release()
+            except Exception as e:
+                print(f"Error getting OS info: {e}") # Or use a message from messages_agent.py
+                os_name = "N/A"
+                os_version = "N/A"
+
             cpu_val = get_cpu_usage()
             gpu_val = get_gpu_usage()
             active_title = get_active_window_title()
@@ -291,7 +300,9 @@ def main():
                 "ip_address": ip_address,
                 "free_disk_space_gb": payload_free_disk_space_gb, # Use the thresholded and rounded value
                 "cpu_usage_percent": final_cpu_usage,
-                "gpu_usage_percent": final_gpu_usage
+                "gpu_usage_percent": final_gpu_usage,
+                "os_name": os_name,                               # New field
+                "os_version": os_version                          # New field
             }
 
             application_payload = {
