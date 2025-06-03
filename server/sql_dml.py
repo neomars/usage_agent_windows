@@ -5,8 +5,8 @@
 
 # --- Queries for /log_activity endpoint ---
 SELECT_COMPUTER_BY_NETBIOS = "SELECT id FROM computers WHERE netbios_name = %s"
-UPDATE_COMPUTER_LAST_SEEN_IP = "UPDATE computers SET ip_address = %s, last_seen = %s WHERE id = %s"
-INSERT_NEW_COMPUTER = "INSERT INTO computers (netbios_name, ip_address, last_seen) VALUES (%s, %s, %s)"
+UPDATE_COMPUTER_LAST_SEEN_IP = "UPDATE computers SET ip_address = %s, last_seen = %s, os_name = %s, os_version = %s WHERE id = %s"
+INSERT_NEW_COMPUTER = "INSERT INTO computers (netbios_name, ip_address, last_seen, os_name, os_version) VALUES (%s, %s, %s, %s, %s)"
 INSERT_ACTIVITY_LOG = """
     INSERT INTO activity_logs
     (computer_id, timestamp, free_disk_space_gb, cpu_usage_percent, gpu_usage_percent)

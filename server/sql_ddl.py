@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS computers (
     ip_address VARCHAR(45),
     last_seen DATETIME,
     group_id INT,
+        os_name VARCHAR(100) NULL,    -- New column
+        os_version VARCHAR(100) NULL, -- New column
     INDEX idx_computer_netbios_name (netbios_name),
     INDEX idx_computer_last_seen (last_seen),
     INDEX idx_computer_group_id (group_id), /* Added index for FK */
