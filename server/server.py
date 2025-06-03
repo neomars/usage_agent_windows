@@ -298,6 +298,31 @@ def log_activity():
             ))
             print(f"Application log for computer_id {computer_id} (Active Window: '{active_window_title}') inserted into application_usage_logs.")
 
+    elif log_type == "ping":
+        ip_address = data.get('ip_address')
+        if not ip_address or not str(ip_address).strip():
+            return jsonify(status="error", message="Missing or empty required key 'ip_address' for log_type 'ping'"), 400
+        ip_address = str(ip_address).strip()
+
+        # 'netbios_name' and 'parsed_timestamp' are already validated and available.
+        # 'result' from SELECT_COMPUTER_BY_NETBIOS is also available.
+
+        computer_id = None
+        if not result: # Computer not found, create it
+            # INSERT_NEW_COMPUTER expects: netbios_name, ip_address, parsed_timestamp, os_name, os_version
+            cursor.execute(sql_dml.INSERT_NEW_COMPUTER, (netbios_name, ip_address, parsed_timestamp, None, None))
+            computer_id = cursor.lastrowid
+            if not computer_id:
+                if conn: conn.rollback()
+                return jsonify(status="error", message="Failed to create new computer record from ping"), 500
+            print(f"New computer '{netbios_name}' created from ping.")
+        else: # Computer exists
+            computer_id = result[0]
+            cursor.execute(sql_dml.UPDATE_COMPUTER_PING_INFO, (ip_address, parsed_timestamp, computer_id))
+
+        print(f"Ping from computer_id {computer_id} ('{netbios_name}') acknowledged and computer record updated.")
+        # Let successful processing fall through to the main commit and success JSON response
+
         else:
             if conn: conn.rollback()
             return jsonify(status="error", message=f"Unknown log_type: {log_type}"), 400

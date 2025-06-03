@@ -125,7 +125,8 @@ def load_app_config():
         'cpu_alert_threshold': 90,
         'gpu_alert_threshold': 90,
         'log_folder': '.',
-        'disk_space_alert_threshold_gb': 20
+        'disk_space_alert_threshold_gb': 20,
+        'ping_interval_seconds': 60
     }
 
     if not os.path.exists(config_file):
@@ -141,13 +142,15 @@ def load_app_config():
         gpu_threshold = parser.getint('agent_settings', 'gpu_alert_threshold', fallback=defaults['gpu_alert_threshold'])
         log_folder = parser.get('agent_settings', 'log_folder', fallback=defaults['log_folder'])
         disk_threshold = parser.getint('agent_settings', 'disk_space_alert_threshold_gb', fallback=defaults['disk_space_alert_threshold_gb'])
+        ping_interval = parser.getint('agent_settings', 'ping_interval_seconds', fallback=defaults['ping_interval_seconds'])
 
         return {
             'server_address': server_address,
             'cpu_alert_threshold': cpu_threshold,
             'gpu_alert_threshold': gpu_threshold,
             'log_folder': log_folder,
-            'disk_space_alert_threshold_gb': disk_threshold
+            'disk_space_alert_threshold_gb': disk_threshold,
+            'ping_interval_seconds': ping_interval
         }
 
     except Exception as e:
@@ -215,6 +218,7 @@ def main():
     print(messages.MSG_CONFIG_GPU_THRESHOLD.format(app_config.get('gpu_alert_threshold', 90)))
     print(messages.MSG_CONFIG_LOG_FOLDER.format(app_config.get('log_folder', '.')))
     print(messages.MSG_CONFIG_DISK_THRESHOLD.format(app_config.get('disk_space_alert_threshold_gb', 20))) # Using .get for safety, though load_app_config ensures it.
+    print(messages.MSG_CONFIG_PING_INTERVAL.format(app_config.get('ping_interval_seconds', 60))) # Using .get for safety
     print(messages.MSG_CONFIG_FOOTER)
 
     server_address = app_config.get('server_address')
@@ -241,10 +245,75 @@ def main():
 
     last_logged_day_str = ""
     # last_windows_update_check_time = None # Line removed
+    last_ping_time = None
 
     while True:
         try:
             # Windows Update Check Logic REMOVED
+
+            # Ping Server Logic (scheduling part)
+            try:
+                current_ping_interval_seconds = app_config.get('ping_interval_seconds', 60)
+                should_send_ping = False
+                now_for_ping = datetime.now() # Use a consistent 'now' for this check block
+
+                if last_ping_time is None: # Send on first run
+                    should_send_ping = True
+                else:
+                    if (now_for_ping - last_ping_time).total_seconds() >= current_ping_interval_seconds:
+                        should_send_ping = True
+
+                if should_send_ping:
+                    print(messages.MSG_ATTEMPTING_SERVER_PING)
+
+                    ping_payload = {
+                        "log_type": "ping",
+                        "timestamp": now_for_ping.isoformat(),
+                        "netbios_name": get_netbios_name(),
+                        "ip_address": get_ip_address()
+                    }
+
+                    local_ping_status_log = {
+                        "event_type": "ping_status",
+                        "timestamp": now_for_ping.isoformat(),
+                        "server_address": server_address if server_address else "N/A",
+                        "status": "failure",
+                        "details": ""
+                    }
+
+                    current_log_path_for_ping = os.path.join(app_config.get('log_folder', '.'), now_for_ping.strftime('%y%m%d') + 'Log_Usage_Windows.log')
+
+                    if server_address and requests_available:
+                        try:
+                            ping_payload_json = json.dumps(ping_payload)
+
+                            if send_data_to_server(server_address, ping_payload_json):
+                                local_ping_status_log["status"] = "success"
+                                local_ping_status_log["details"] = messages.MSG_PING_SEND_SUCCESS_DETAILS.format(server_address)
+                            else:
+                                local_ping_status_log["details"] = f"Ping attempt to {server_address} failed. Check agent console output for specific errors from send_data_to_server."
+
+                        except Exception as e:
+                            error_detail = messages.MSG_PING_SEND_EXCEPTION_DETAILS.format(server_address if server_address else "N/A", str(e))
+                            local_ping_status_log["details"] = error_detail
+                            print(f"CRITICAL: {error_detail}")
+                    else:
+                        if not server_address:
+                            local_ping_status_log["details"] = messages.MSG_PING_SKIPPED_NO_SERVER_DETAILS
+                        elif not requests_available:
+                            local_ping_status_log["details"] = messages.MSG_PING_SKIPPED_NO_REQUESTS_DETAILS
+
+                    try:
+                        log_data_to_file(current_log_path_for_ping, json.dumps(local_ping_status_log))
+                    except Exception as e:
+                        print(messages.MSG_ERROR_WRITING_PING_STATUS_LOG.format(str(e)))
+
+                    last_ping_time = now_for_ping # Update last_ping_time after attempt
+
+            except Exception as e:
+                # This will now use a message if defined, or fallback to f-string.
+                # Assuming a generic scheduling error message might be added later if needed.
+                print(f"Error in ping scheduling logic: {e}")
 
             # Regular data collection starts here
             current_time = datetime.now() # This current_time is for the main machine/app payloads

@@ -25,6 +25,8 @@ SELECT_ALL_GROUPS = "SELECT id, name, description FROM computer_groups ORDER BY 
 # SELECT_GROUP_BY_ID = "SELECT id, name, description FROM computer_groups WHERE id = %s" # Potentially useful
 SELECT_GROUP_BY_NAME = "SELECT id FROM computer_groups WHERE name = %s" # Used in assign_group
 
+UPDATE_COMPUTER_PING_INFO = "UPDATE computers SET ip_address = %s, last_seen = %s WHERE id = %s"
+
 # --- Queries for Assigning Computer to Group (/api/computers/.../assign_group) ---
 # SELECT_COMPUTER_BY_NETBIOS is already defined above.
 # SELECT_GROUP_BY_NAME is already defined above.
