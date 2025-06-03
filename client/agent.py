@@ -256,14 +256,27 @@ def main():
             gpu_val = get_gpu_usage()
             active_title = get_active_window_title()
 
+            cpu_alert_threshold = app_config.get('cpu_alert_threshold', 90) # Default 90 if not in config
+            gpu_alert_threshold = app_config.get('gpu_alert_threshold', 90) # Default 90 if not in config
+
+            final_cpu_usage = None
+            if cpu_val is not None:
+                if cpu_val > cpu_alert_threshold:
+                    final_cpu_usage = round(cpu_val, 1)
+
+            final_gpu_usage = None
+            if gpu_val is not None:
+                if gpu_val > gpu_alert_threshold:
+                    final_gpu_usage = round(gpu_val, 1)
+
             machine_payload = {
                 "log_type": "machine",
                 "timestamp": current_time.isoformat(),
                 "netbios_name": netbios_name,
                 "ip_address": ip_address,
-                "free_disk_space_gb": free_space_gb, # free_space_gb is already rounded or None
-                "cpu_usage_percent": round(cpu_val, 1) if cpu_val is not None else None,
-                "gpu_usage_percent": round(gpu_val, 1) if gpu_val is not None else None
+                "free_disk_space_gb": free_space_gb,
+                "cpu_usage_percent": final_cpu_usage,
+                "gpu_usage_percent": final_gpu_usage
             }
 
             application_payload = {
