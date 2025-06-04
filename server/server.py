@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, send_from_directory # Removed render_template, added send_from_directory
 import sys
+import os # Added os import
 from datetime import datetime, timedelta
 from . import sql_ddl  # Relative import
 # Ensure this is present, it was in the original code so should be fine.
@@ -69,10 +70,20 @@ except ImportError:
 
 # Flask app initialized considering new path for templates and static files
 # SCRIPT_DIR is already defined
-TEMPLATE_DIR = os.path.join(SCRIPT_DIR, 'templates')
-STATIC_DIR = os.path.join(SCRIPT_DIR, 'static')
-app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
+# TEMPLATE_DIR = os.path.join(SCRIPT_DIR, 'templates') # Will be removed if no other templates
+# STATIC_DIR = os.path.join(SCRIPT_DIR, 'static') # Old static dir
 
+REACT_BUILD_DIR = os.path.join(SCRIPT_DIR, '..', 'frontend', 'build')
+
+app = Flask(__name__, static_folder=os.path.join(REACT_BUILD_DIR, 'static'))
+# If 'templates' folder and render_template are no longer used AT ALL,
+# then template_folder arg can be removed from Flask() and TEMPLATE_DIR definition.
+# For now, let's assume it might still be used by a route not touched in this plan.
+# If it's confirmed no other Jinja2 templates, we'd remove template_folder.
+# For this step, let's keep template_folder definition for safety if other routes use it.
+# SCRIPT_DIR is defined earlier.
+TEMPLATE_DIR = os.path.join(SCRIPT_DIR, 'templates') # Kept for now
+app.template_folder = TEMPLATE_DIR # Explicitly set if Flask() didn't get it.
 
 # --- Database Connection Function ---
 def get_db_connection():
@@ -120,77 +131,144 @@ def create_tables(conn):
             cursor.close()
 
 # --- Web Page Routes ---
-@app.route('/')
-def dashboard_page():
+# @app.route('/')
+# def dashboard_page():
+#     conn = None
+#     cursor = None
+#     computer_list = []
+#     alerts = []
+#     error_message = None
+#
+#     try:
+#         conn = get_db_connection()
+#         if conn:
+#             cursor = conn.cursor()
+#             cursor.execute(sql_dml.SELECT_COMPUTERS_FOR_DASHBOARD) # Uses relative import: sql_dml
+#             rows = cursor.fetchall()
+#             now = datetime.now()
+#
+#             for row in rows:
+#                 computer_data = {
+#                     'id': row[0], 'netbios_name': row[1], 'ip_address': row[2],
+#                     'last_seen': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else 'Never',
+#                     'group_name': row[4], 'group_id': row[5]
+#                 }
+#                 computer_list.append(computer_data)
+#
+#                 if row[3]:
+#                     last_seen_dt = row[3]
+#                     if now - last_seen_dt > timedelta(minutes=OFFLINE_THRESHOLD_MINUTES):
+#                         alerts.append({
+#                             'netbios_name': computer_data['netbios_name'], 'ip_address': computer_data['ip_address'],
+#                             'alert_type': 'Offline', 'details': f"Last seen: {computer_data['last_seen']}"
+#                         })
+#                 elif computer_data['last_seen'] == 'Never':
+#                      alerts.append({
+#                         'netbios_name': computer_data['netbios_name'], 'ip_address': computer_data['ip_address'],
+#                         'alert_type': 'Offline', 'details': "Never seen (no activity logs yet)"
+#                     })
+#
+#                 cursor.execute(sql_dml.SELECT_LATEST_ACTIVITY_FOR_COMPUTER, (computer_data['id'],))
+#                 latest_log = cursor.fetchone()
+#
+#                 if latest_log:
+#                     cpu_usage, gpu_usage, log_timestamp_dt = latest_log[0], latest_log[1], latest_log[2]
+#                     log_timestamp = log_timestamp_dt.strftime('%Y-%m-%d %H:%M:%S') if log_timestamp_dt else 'N/A'
+#
+#                     if cpu_usage is not None and cpu_usage > CPU_ALERT_THRESHOLD:
+#                         alerts.append({
+#                             'netbios_name': computer_data['netbios_name'], 'ip_address': computer_data['ip_address'],
+#                             'alert_type': 'High CPU Usage', 'details': f"CPU at {cpu_usage:.1f}% on {log_timestamp}"
+#                         })
+#                     if gpu_usage is not None and gpu_usage > GPU_ALERT_THRESHOLD:
+#                         alerts.append({
+#                             'netbios_name': computer_data['netbios_name'], 'ip_address': computer_data['ip_address'],
+#                             'alert_type': 'High GPU Usage', 'details': f"GPU at {gpu_usage:.1f}% on {log_timestamp}"
+#                         })
+#         else:
+#             error_message = messages.DASHBOARD_DB_CONN_FAILED_ERROR
+#             print(error_message)
+#
+#     except mariadb.Error as e:
+#         error_message = messages.DASHBOARD_DB_FETCH_ERROR.format(e)
+#         print(error_message)
+#     except Exception as e:
+#         error_message = messages.DASHBOARD_UNEXPECTED_FETCH_ERROR.format(e)
+#         print(error_message)
+#     finally:
+#         if cursor: cursor.close()
+#         if conn: conn.close()
+#
+#     return render_template('dashboard.html', computers=computer_list, alerts=alerts, error_message=error_message)
+
+# --- API Routes ---
+@app.route('/api/dashboard_data')
+def api_dashboard_data():
     conn = None
     cursor = None
-    computer_list = []
-    alerts = []
-    error_message = None
-
+    computer_list_data = []
+    alerts_data = []
+    # (Ensure datetime, timedelta, mariadb, sql_dml are imported)
+    # (Ensure OFFLINE_THRESHOLD_MINUTES, CPU_ALERT_THRESHOLD, GPU_ALERT_THRESHOLD are defined)
     try:
         conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            cursor.execute(sql_dml.SELECT_COMPUTERS_FOR_DASHBOARD) # Uses relative import: sql_dml
-            rows = cursor.fetchall()
-            now = datetime.now()
+        if not conn:
+            return jsonify(status="error", message="Database connection failed for dashboard data.", computers=[], alerts=[]), 500
+        cursor = conn.cursor()
+        cursor.execute(sql_dml.SELECT_COMPUTERS_FOR_DASHBOARD)
+        rows = cursor.fetchall()
+        now = datetime.now()
 
-            for row in rows:
-                computer_data = {
-                    'id': row[0], 'netbios_name': row[1], 'ip_address': row[2],
-                    'last_seen': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else 'Never',
-                    'group_name': row[4], 'group_id': row[5]
-                }
-                computer_list.append(computer_data)
+        for row_data in rows:
+            computer_item = {
+                'id': row_data[0], 'netbios_name': row_data[1], 'ip_address': row_data[2],
+                'last_seen': row_data[3].strftime('%Y-%m-%d %H:%M:%S') if row_data[3] else 'Never',
+                'group_name': row_data[4], 'group_id': row_data[5]
+            }
+            computer_list_data.append(computer_item)
 
-                if row[3]:
-                    last_seen_dt = row[3]
-                    if now - last_seen_dt > timedelta(minutes=OFFLINE_THRESHOLD_MINUTES):
-                        alerts.append({
-                            'netbios_name': computer_data['netbios_name'], 'ip_address': computer_data['ip_address'],
-                            'alert_type': 'Offline', 'details': f"Last seen: {computer_data['last_seen']}"
-                        })
-                elif computer_data['last_seen'] == 'Never':
-                     alerts.append({
-                        'netbios_name': computer_data['netbios_name'], 'ip_address': computer_data['ip_address'],
-                        'alert_type': 'Offline', 'details': "Never seen (no activity logs yet)"
+            if row_data[3]:
+                last_seen_dt = row_data[3]
+                if now - last_seen_dt > timedelta(minutes=OFFLINE_THRESHOLD_MINUTES):
+                    alerts_data.append({
+                        'netbios_name': computer_item['netbios_name'], 'ip_address': computer_item['ip_address'],
+                        'alert_type': 'Offline', 'details': f"Last seen: {computer_item['last_seen']}"
                     })
+            elif computer_item['last_seen'] == 'Never':
+                 alerts_data.append({
+                    'netbios_name': computer_item['netbios_name'], 'ip_address': computer_item['ip_address'],
+                    'alert_type': 'Offline', 'details': "Never seen (no activity logs yet)"
+                })
 
-                cursor.execute(sql_dml.SELECT_LATEST_ACTIVITY_FOR_COMPUTER, (computer_data['id'],))
-                latest_log = cursor.fetchone()
+            cursor.execute(sql_dml.SELECT_LATEST_ACTIVITY_FOR_COMPUTER, (computer_item['id'],))
+            latest_log = cursor.fetchone()
 
-                if latest_log:
-                    cpu_usage, gpu_usage, log_timestamp_dt = latest_log[0], latest_log[1], latest_log[2]
-                    log_timestamp = log_timestamp_dt.strftime('%Y-%m-%d %H:%M:%S') if log_timestamp_dt else 'N/A'
+            if latest_log:
+                cpu_usage, gpu_usage, log_timestamp_dt = latest_log[0], latest_log[1], latest_log[2]
+                log_timestamp_str = log_timestamp_dt.strftime('%Y-%m-%d %H:%M:%S') if log_timestamp_dt else 'N/A'
 
-                    if cpu_usage is not None and cpu_usage > CPU_ALERT_THRESHOLD:
-                        alerts.append({
-                            'netbios_name': computer_data['netbios_name'], 'ip_address': computer_data['ip_address'],
-                            'alert_type': 'High CPU Usage', 'details': f"CPU at {cpu_usage:.1f}% on {log_timestamp}"
-                        })
-                    if gpu_usage is not None and gpu_usage > GPU_ALERT_THRESHOLD:
-                        alerts.append({
-                            'netbios_name': computer_data['netbios_name'], 'ip_address': computer_data['ip_address'],
-                            'alert_type': 'High GPU Usage', 'details': f"GPU at {gpu_usage:.1f}% on {log_timestamp}"
-                        })
-        else:
-            error_message = messages.DASHBOARD_DB_CONN_FAILED_ERROR
-            print(error_message)
-
+                if cpu_usage is not None and cpu_usage > CPU_ALERT_THRESHOLD:
+                    alerts_data.append({
+                        'netbios_name': computer_item['netbios_name'], 'ip_address': computer_item['ip_address'],
+                        'alert_type': 'High CPU Usage', 'details': f"CPU at {cpu_usage:.1f}% on {log_timestamp_str}"
+                    })
+                if gpu_usage is not None and gpu_usage > GPU_ALERT_THRESHOLD:
+                    alerts_data.append({
+                        'netbios_name': computer_item['netbios_name'], 'ip_address': computer_item['ip_address'],
+                        'alert_type': 'High GPU Usage', 'details': f"GPU at {gpu_usage:.1f}% on {log_timestamp_str}"
+                    })
     except mariadb.Error as e:
-        error_message = messages.DASHBOARD_DB_FETCH_ERROR.format(e)
-        print(error_message)
+        print(f"Database error in /api/dashboard_data: {e}")
+        return jsonify(status="error", message=f"Database error: {str(e)}", computers=[], alerts=[]), 500
     except Exception as e:
-        error_message = messages.DASHBOARD_UNEXPECTED_FETCH_ERROR.format(e)
-        print(error_message)
+        import traceback
+        print(f"Unexpected error in /api/dashboard_data: {e}\n{traceback.format_exc()}")
+        return jsonify(status="error", message=f"An unexpected server error occurred: {str(e)}", computers=[], alerts=[]), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+    return jsonify(computers=computer_list_data, alerts=alerts_data)
 
-    return render_template('dashboard.html', computers=computer_list, alerts=alerts, error_message=error_message)
-
-# --- API Routes ---
 # (Error logging in API routes will use generic messages for now, or can be enhanced with app.logger)
 # Make sure 'from datetime import datetime' is at the top of server.py
 # from . import sql_dml # Should already exist
@@ -455,6 +533,15 @@ def assign_computer_to_group(netbios_name):
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+
+# --- Serve React App ---
+# This route should be defined AFTER all API routes.
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all_spa(path):
+    if path != "" and os.path.exists(os.path.join(REACT_BUILD_DIR, path)):
+        return send_from_directory(REACT_BUILD_DIR, path)
+    return send_from_directory(REACT_BUILD_DIR, 'index.html')
 
 # --- Main Execution ---
 if __name__ == '__main__':

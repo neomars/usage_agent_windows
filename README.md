@@ -251,3 +251,73 @@ This project includes a suite of unit tests for both the agent and server compon
     ./run_tests.sh
     ```
 4.  The script will run all tests in `tests/test_agent.py` and `tests/test_server.py` and report whether all test suites passed or if any failures occurred.
+
+## Project Setup and Running
+
+This project consists of a Python Flask backend and a React frontend.
+
+### Backend (Flask Server)
+
+1.  **Navigate to the `server` directory:**
+    ```bash
+    cd server
+    ```
+
+2.  **Create a Python virtual environment (recommended):**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
+
+3.  **Install Python dependencies:**
+    Make sure you have `server/requirements.txt`.
+    ```bash
+    pip install -r requirements.txt
+    ```
+    *(Note: If `server/requirements.txt` doesn't exist or is incomplete, it should be created/updated. Key dependencies are Flask and mariadb.)*
+
+4.  **Database Setup:**
+    - Ensure MariaDB server is running.
+    - Configure database connection details: The `server/setup_database.py` script will guide you through creating `db_config.ini` and setting up tables. Run it from the project root:
+        ```bash
+        python server/setup_database.py
+        ```
+    - Follow the prompts. This script assumes you have already created a database and a user with privileges in MariaDB.
+
+5.  **Run the Flask server:**
+    From the `server` directory (with virtual environment activated):
+    ```bash
+    python server.py
+    ```
+    The server will typically start on `http://localhost:5000`.
+
+### Frontend (React App)
+
+1.  **Navigate to the `frontend` directory:**
+    ```bash
+    cd frontend
+    ```
+    *(If you are in the `server` directory from backend setup, you'd do `cd ../frontend`)*
+
+2.  **Install Node.js dependencies:**
+    ```bash
+    npm install
+    ```
+
+3.  **Build the React app for production:**
+    ```bash
+    npm run build
+    ```
+    This creates an optimized build in the `frontend/build` directory. The Flask server is configured to serve files from this location.
+
+4.  **Development (Optional):**
+    To run the React app in development mode with live reloading (useful when making frontend changes):
+    ```bash
+    npm start
+    ```
+    This will typically open the app on `http://localhost:3000`. Note that for API calls to work correctly with the Flask backend, you might need to configure proxy settings in `frontend/package.json` (e.g., `"proxy": "http://localhost:5000"`). For the integrated build served by Flask, this proxy is not needed.
+
+### Accessing the Application
+
+Once both the backend server is running and the frontend has been built (and Flask is serving it):
+- Open your browser and navigate to `http://localhost:5000` (or the port your Flask server is running on).

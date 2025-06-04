@@ -1,0 +1,43 @@
+.dashboard-page {
+  padding: 20px;
+}
+
+.computers-section, .alerts-section {
+  margin-bottom: 30px;
+  padding: 15px;
+  border: 1px solid #eee;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+}
+
+.computers-section h3, .alerts-section h3 {
+  margin-top: 0;
+}
+
+.computers-section table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.computers-section th, .computers-section td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.computers-section th {
+  background-color: #f0f0f0;
+}
+
+.alerts-section ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.alerts-section li {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+ .alerts-section li:last-child {
+  border-bottom: none;
+}
