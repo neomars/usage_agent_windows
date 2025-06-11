@@ -327,6 +327,24 @@ Once both the backend server is running and the frontend has been built (and Fla
 
 The server component requires a connection to a MariaDB database. Configuration for this connection is managed through the `server/db_config.ini` file.
 
+### System Prerequisites for `mariadb` Package Installation (Linux)
+
+Before installing the Python requirements for the server (specifically the `mariadb` package), you may need to install several system-level dependencies if they are not already present. These are typically required for compiling the `mariadb` Python package from source on Linux systems.
+
+-   **MariaDB C Connector Development Libraries:** Provides `mariadb_config` and other files needed to compile the connector.
+    -   On Debian/Ubuntu: `sudo apt install libmariadb-dev` (or `libmariadbclient-dev`)
+    -   On Fedora/RHEL: `sudo dnf install mariadb-connector-c-devel` (or `mariadb-devel`)
+
+-   **Build Tools:** Provides the C compiler (like GCC) and other essential build utilities.
+    -   On Debian/Ubuntu: `sudo apt install build-essential`
+    -   On Fedora/RHEL: `sudo dnf groupinstall "Development Tools"`
+
+-   **Python Development Headers:** Provides `Python.h` and other headers for your Python version, needed to build Python C extensions.
+    -   On Debian/Ubuntu: `sudo apt install python3.x-dev` (replace `x` with your specific Python minor version, e.g., `python3.11-dev`)
+    -   On Fedora/RHEL: `sudo dnf install python3.x-devel` (replace `x` with your specific Python minor version, e.g., `python3.11-devel`)
+
+After ensuring these system prerequisites are met, you should be able to successfully install the Python dependencies using `pip install -r server/requirements.txt` within your activated virtual environment.
+
 ### `server/db_config.ini`
 
 This file must contain the following details under a `[database]` section:
