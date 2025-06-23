@@ -321,3 +321,65 @@ This project consists of a Python Flask backend and a React frontend.
 
 Once both the backend server is running and the frontend has been built (and Flask is serving it):
 - Open your browser and navigate to `http://localhost:5000` (or the port your Flask server is running on).
+
+
+## Server Database Configuration
+
+The server component requires a connection to a MariaDB database. Configuration for this connection is managed through the `server/db_config.ini` file.
+
+### System Prerequisites for `mariadb` Package Installation (Linux)
+
+Before installing the Python requirements for the server (specifically the `mariadb` package), you may need to install several system-level dependencies if they are not already present. These are typically required for compiling the `mariadb` Python package from source on Linux systems.
+
+-   **MariaDB C Connector Development Libraries:** Provides `mariadb_config` and other files needed to compile the connector.
+    -   On Debian/Ubuntu: `sudo apt install libmariadb-dev` (or `libmariadbclient-dev`)
+    -   On Fedora/RHEL: `sudo dnf install mariadb-connector-c-devel` (or `mariadb-devel`)
+
+-   **Build Tools:** Provides the C compiler (like GCC) and other essential build utilities.
+    -   On Debian/Ubuntu: `sudo apt install build-essential`
+    -   On Fedora/RHEL: `sudo dnf groupinstall "Development Tools"`
+
+-   **Python Development Headers:** Provides `Python.h` and other headers for your Python version, needed to build Python C extensions.
+    -   On Debian/Ubuntu: `sudo apt install python3.x-dev` (replace `x` with your specific Python minor version, e.g., `python3.11-dev`)
+    -   On Fedora/RHEL: `sudo dnf install python3.x-devel` (replace `x` with your specific Python minor version, e.g., `python3.11-devel`)
+
+After ensuring these system prerequisites are met, you should be able to successfully install the Python dependencies using `pip install -r server/requirements.txt` within your activated virtual environment.
+
+### `server/db_config.ini`
+
+This file must contain the following details under a `[database]` section:
+
+-   `host`: The hostname or IP address of your MariaDB server.
+-   `user`: The username for the database connection.
+-   `password`: The password for the specified user.
+-   `name`: The name of the database to be used (e.g., `agent_data_db`).
+
+A template `server/db_config.ini` is provided with placeholder values. You **must** replace these placeholders with your actual database credentials.
+
+**Example `server/db_config.ini`:**
+```ini
+[database]
+host = 127.0.0.1
+user = my_db_user
+password = my_secret_password
+name = agent_data_db
+```
+
+### Automatic Configuration using `setup_database.py`
+
+Alternatively, you can run the `server/setup_database.py` script:
+
+```bash
+python server/setup_database.py
+```
+
+This script will interactively prompt you for the database details, attempt to connect to the database, create the necessary tables (if they don't exist), and then automatically generate the `server/db_config.ini` file with the provided information.
+
+### Security Note
+
+Ensure that the `server/db_config.ini` file is secured appropriately. It contains sensitive database credentials. It is highly recommended to add this file to your `.gitignore` file if it's not already included, to prevent accidental commitment of credentials to your repository.
+
+```
+# Example .gitignore entry
+server/db_config.ini
+```

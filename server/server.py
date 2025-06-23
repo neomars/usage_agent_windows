@@ -376,51 +376,61 @@ def log_activity():
             ))
             print(f"Application log for computer_id {computer_id} (Active Window: '{active_window_title}') inserted into application_usage_logs.")
 
-    elif log_type == "ping":
-        ip_address = data.get('ip_address')
-        if not ip_address or not str(ip_address).strip():
-            return jsonify(status="error", message="Missing or empty required key 'ip_address' for log_type 'ping'"), 400
-        ip_address = str(ip_address).strip()
+        elif log_type == "ping":
+            ip_address = data.get('ip_address')
+            if not ip_address or not str(ip_address).strip():
+                return jsonify(status="error", message="Missing or empty required key 'ip_address' for log_type 'ping'"), 400
+            ip_address = str(ip_address).strip()
 
-        # 'netbios_name' and 'parsed_timestamp' are already validated and available.
-        # 'result' from SELECT_COMPUTER_BY_NETBIOS is also available.
+            # 'netbios_name' and 'parsed_timestamp' are already validated and available.
+            # 'result' from SELECT_COMPUTER_BY_NETBIOS is also available.
 
-        computer_id = None
-        if not result: # Computer not found, create it
-            # INSERT_NEW_COMPUTER expects: netbios_name, ip_address, parsed_timestamp, os_name, os_version
-            cursor.execute(sql_dml.INSERT_NEW_COMPUTER, (netbios_name, ip_address, parsed_timestamp, None, None))
-            computer_id = cursor.lastrowid
-            if not computer_id:
-                if conn: conn.rollback()
-                return jsonify(status="error", message="Failed to create new computer record from ping"), 500
-            print(f"New computer '{netbios_name}' created from ping.")
-        else: # Computer exists
-            computer_id = result[0]
-            cursor.execute(sql_dml.UPDATE_COMPUTER_PING_INFO, (ip_address, parsed_timestamp, computer_id))
+            computer_id = None
+            if not result: # Computer not found, create it
+                # INSERT_NEW_COMPUTER expects: netbios_name, ip_address, parsed_timestamp, os_name, os_version
+                cursor.execute(sql_dml.INSERT_NEW_COMPUTER, (netbios_name, ip_address, parsed_timestamp, None, None))
+                computer_id = cursor.lastrowid
+                if not computer_id:
+                    # No commit here, let the error handling do its job (rollback)
+                    return jsonify(status="error", message="Failed to create new computer record from ping"), 500
+                print(f"New computer '{netbios_name}' created from ping.")
+            else: # Computer exists
+                computer_id = result[0]
+                cursor.execute(sql_dml.UPDATE_COMPUTER_PING_INFO, (ip_address, parsed_timestamp, computer_id))
 
-        print(f"Ping from computer_id {computer_id} ('{netbios_name}') acknowledged and computer record updated.")
-        # Let successful processing fall through to the main commit and success JSON response
+            print(f"Ping from computer_id {computer_id} ('{netbios_name}') acknowledged and computer record updated.")
+            # Successful processing of "ping" falls through to commit and success response.
 
-        else:
-            if conn: conn.rollback()
+        else: # Unknown log_type
+            # No commit here, as it's an error condition.
             return jsonify(status="error", message=f"Unknown log_type: {log_type}"), 400
 
+        # conn.commit() and success jsonify are now correctly placed inside the try block,
+        # and will only be reached if no 'return' was hit in the if/elif/else chain above.
         conn.commit()
-        return jsonify(status="success", message=f"Log type '{log_type}' acknowledged for '{netbios_name}'. Computer record updated/verified. Specific data insertion follows in next steps."), 200
+        return jsonify(status="success", message=f"Log type '{log_type}' acknowledged for '{netbios_name}'. Computer record updated/verified."), 200
 
     except mariadb.Error as e:
         if conn:
-            try: conn.rollback()
-            except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
         print(messages.API_DB_ERROR_GENERAL.format('/log_activity', e)) # Using existing key
         return jsonify(status="error", message=f"Database error: {str(e)}"), 500
     except ValueError as e: # Catch specific ValueErrors from timestamp parsing or other conversions
-        if conn: conn.rollback()
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key for consistency
         return jsonify(status="error", message=f"Data validation error: {str(e)}"), 400
     except Exception as e:
         if conn:
-            try: conn.rollback()
-            except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
         import traceback
         print(f"Unexpected error in /log_activity: {e}\n{traceback.format_exc()}")
         print(messages.API_UNEXPECTED_ERROR_GENERAL.format('/log_activity', e))
@@ -447,16 +457,22 @@ def create_group():
         conn.commit()
         return jsonify(status="success", message="Group created successfully", group_name=group_name), 201
     except mariadb.Error as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err))
         if hasattr(e, 'errno') and e.errno == 1062:
             err_msg = f"Group name '{group_name}' already exists." if 'name' in str(e).lower() else f"Duplicate entry: {str(e)}"
             return jsonify(status="error", message=err_msg), 409
         print(messages.API_DB_ERROR_GENERAL.format('/api/groups/create', e))
         return jsonify(status="error", message=f"Database error: {str(e)}"), 500
     except Exception as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err))
         print(messages.API_UNEXPECTED_ERROR_GENERAL.format('/api/groups/create', e))
         return jsonify(status="error", message=f"An unexpected server error occurred: {str(e)}"), 500
     finally:
@@ -519,15 +535,21 @@ def assign_computer_to_group(netbios_name):
         action = "assigned to group" if target_group_id is not None else "unassigned from group"
         return jsonify(status="success", message=f"Computer '{netbios_name}' {action} successfully."), 200
     except mariadb.Error as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err))
         if hasattr(e, 'errno') and e.errno == 1452 and 'group_id' in str(e).lower():
              return jsonify(status="error", message=f"Invalid 'group_id': The specified group does not exist."), 400
         print(messages.API_DB_ERROR_GENERAL.format(f'/api/computers/.../assign_group', e))
         return jsonify(status="error", message=f"Database error: {str(e)}"), 500
     except Exception as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err))
         print(messages.API_UNEXPECTED_ERROR_GENERAL.format(f'/api/computers/.../assign_group', e))
         return jsonify(status="error", message=f"An unexpected server error occurred: {str(e)}"), 500
     finally:
@@ -578,4 +600,4 @@ if __name__ == '__main__':
             db_conn_startup.close()
 
     print(messages.SERVER_FLASK_STARTING)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=80)
