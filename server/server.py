@@ -412,17 +412,25 @@ def log_activity():
 
     except mariadb.Error as e:
         if conn:
-            try: conn.rollback()
-            except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
         print(messages.API_DB_ERROR_GENERAL.format('/log_activity', e)) # Using existing key
         return jsonify(status="error", message=f"Database error: {str(e)}"), 500
     except ValueError as e: # Catch specific ValueErrors from timestamp parsing or other conversions
-        if conn: conn.rollback()
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key for consistency
         return jsonify(status="error", message=f"Data validation error: {str(e)}"), 400
     except Exception as e:
         if conn:
-            try: conn.rollback()
-            except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err)) # Using existing key
         import traceback
         print(f"Unexpected error in /log_activity: {e}\n{traceback.format_exc()}")
         print(messages.API_UNEXPECTED_ERROR_GENERAL.format('/log_activity', e))
@@ -449,16 +457,22 @@ def create_group():
         conn.commit()
         return jsonify(status="success", message="Group created successfully", group_name=group_name), 201
     except mariadb.Error as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err))
         if hasattr(e, 'errno') and e.errno == 1062:
             err_msg = f"Group name '{group_name}' already exists." if 'name' in str(e).lower() else f"Duplicate entry: {str(e)}"
             return jsonify(status="error", message=err_msg), 409
         print(messages.API_DB_ERROR_GENERAL.format('/api/groups/create', e))
         return jsonify(status="error", message=f"Database error: {str(e)}"), 500
     except Exception as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err))
         print(messages.API_UNEXPECTED_ERROR_GENERAL.format('/api/groups/create', e))
         return jsonify(status="error", message=f"An unexpected server error occurred: {str(e)}"), 500
     finally:
@@ -521,15 +535,21 @@ def assign_computer_to_group(netbios_name):
         action = "assigned to group" if target_group_id is not None else "unassigned from group"
         return jsonify(status="success", message=f"Computer '{netbios_name}' {action} successfully."), 200
     except mariadb.Error as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err))
         if hasattr(e, 'errno') and e.errno == 1452 and 'group_id' in str(e).lower():
              return jsonify(status="error", message=f"Invalid 'group_id': The specified group does not exist."), 400
         print(messages.API_DB_ERROR_GENERAL.format(f'/api/computers/.../assign_group', e))
         return jsonify(status="error", message=f"Database error: {str(e)}"), 500
     except Exception as e:
-        if conn: try: conn.rollback()
-                 except mariadb.Error as rb_err: print(messages.API_ROLLBACK_ERROR.format(rb_err))
+        if conn:
+            try:
+                conn.rollback()
+            except mariadb.Error as rb_err:
+                print(messages.API_ROLLBACK_ERROR.format(rb_err))
         print(messages.API_UNEXPECTED_ERROR_GENERAL.format(f'/api/computers/.../assign_group', e))
         return jsonify(status="error", message=f"An unexpected server error occurred: {str(e)}"), 500
     finally:
@@ -580,4 +600,4 @@ if __name__ == '__main__':
             db_conn_startup.close()
 
     print(messages.SERVER_FLASK_STARTING)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=80)
